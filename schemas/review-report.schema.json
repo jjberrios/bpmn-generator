@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bpmn-reverse-engineer.local/schemas/review-report.schema.json",
+  "title": "Informe de revisión",
+  "type": "object",
+  "required": ["schema_version", "process_id", "reviewer", "verdict", "findings", "unconfirmed_inferences", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "process_id": { "type": "string" },
+    "reviewer": { "type": "string", "description": "Nombre del agente o herramienta que produjo el informe." },
+    "verdict": { "enum": ["APROBADO", "APROBADO_CON_OBSERVACIONES", "RECHAZADO"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "description", "recommendation"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "enum": ["CRÍTICO", "ALTO", "MEDIO", "BAJO", "INFORMATIVO"] },
+          "category": {
+            "enum": [
+              "ACTIVIDAD_SIN_EVIDENCIA", "ACTIVIDAD_INVENTADA", "RAMA_OMITIDA", "DECISION_MAL_INTERPRETADA",
+              "EVIDENCIA_INEXISTENTE", "OPERACION_OMITIDA", "PARTICIPANTE_INJUSTIFICADO", "EVENTO_INCOHERENTE",
+              "FLUJO_INCONSISTENTE", "BPMN_INCORRECTO", "ABSTRACCION_INADECUADA", "COMPORTAMIENTO_NO_RESUELTO",
+              "INFERENCIA_NO_CONFIRMADA", "ESTRUCTURA", "OTRO"
+            ]
+          },
+          "element_id": { "type": "string" },
+          "description": { "type": "string" },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["file"],
+              "additionalProperties": false,
+              "properties": {
+                "file": { "type": "string" },
+                "line_start": { "type": "integer", "minimum": 1 },
+                "line_end": { "type": "integer", "minimum": 1 },
+                "class": { "type": "string" },
+                "method": { "type": "string" }
+              }
+            }
+          },
+          "recommendation": { "type": "string" },
+          "source": { "enum": ["automatico", "agente"] }
+        }
+      }
+    },
+    "unconfirmed_inferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["element_id", "status", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "element_id": { "type": "string" },
+          "status": { "enum": ["INFERIDA", "DESCONOCIDA"] },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "CRÍTICO": { "type": "integer" },
+        "ALTO": { "type": "integer" },
+        "MEDIO": { "type": "integer" },
+        "BAJO": { "type": "integer" },
+        "INFORMATIVO": { "type": "integer" }
+      }
+    },
+    "summary": { "type": "string" }
+  }
+}

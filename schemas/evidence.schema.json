@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bpmn-reverse-engineer.local/schemas/evidence.schema.json",
+  "title": "Evidencia",
+  "description": "Referencia comprobable al código fuente que respalda un elemento del análisis. Categorías: CONFIRMADA (directamente sustentada por el código), INFERIDA (deducida de evidencias relacionadas), DESCONOCIDA (sin evidencia suficiente).",
+  "type": "object",
+  "required": ["id", "status", "file"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+    "status": { "enum": ["CONFIRMADA", "INFERIDA", "DESCONOCIDA"] },
+    "file": { "type": "string", "minLength": 1, "description": "Ruta relativa al proyecto extraído, con '/' como separador." },
+    "line_start": { "type": "integer", "minimum": 1 },
+    "line_end": { "type": "integer", "minimum": 1 },
+    "class": { "type": "string" },
+    "method": { "type": "string" },
+    "snippet": { "type": "string", "maxLength": 400, "description": "Fragmento textual literal del código (sin secretos). Permite verificar la referencia." },
+    "justification": { "type": "string", "description": "Obligatoria cuando status != CONFIRMADA: por qué se infiere o qué falta." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "enum": ["INFERIDA", "DESCONOCIDA"] } }, "required": ["status"] },
+      "then": { "required": ["justification"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "CONFIRMADA" } }, "required": ["status"] },
+      "then": { "required": ["line_start"] }
+    }
+  ]
+}

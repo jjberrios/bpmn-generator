@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bpmn-reverse-engineer.local/schemas/execution-trace.schema.json",
+  "title": "Traza de ejecución",
+  "description": "Grafo de ejecución reconstruido desde cada punto de entrada hasta sus resultados observables. Cada nodo se vincula a evidencia.",
+  "type": "object",
+  "required": ["schema_version", "project_id", "traces"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "project_id": { "type": "string" },
+    "generator": { "type": "string" },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "entry_point_id", "nodes", "edges", "evidence", "paths", "limitations"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "entry_point_id": { "type": "string" },
+          "entry": {
+            "type": "object",
+            "required": ["class", "method"],
+            "additionalProperties": false,
+            "properties": {
+              "class": { "type": "string" },
+              "method": { "type": "string" },
+              "kind": { "type": "string" },
+              "http_method": { "type": "string" },
+              "path": { "type": "string" }
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "type", "label", "evidence_id"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string" },
+                "type": { "enum": ["entry", "action", "call", "decision", "external_call", "persistence", "return", "throw", "catch", "unresolved_call", "loop", "retry", "async"] },
+                "label": { "type": "string" },
+                "class": { "type": "string" },
+                "method": { "type": "string" },
+                "condition": { "type": "string", "description": "Expresión literal del código para nodos decision/loop." },
+                "operation": { "type": "string", "description": "read | write | delete | http_get | http_post ..." },
+                "target": { "type": "string" },
+                "mechanism": { "type": "string" },
+                "exception_type": { "type": "string" },
+                "outcome": { "type": "string", "description": "Resultado observable en return/throw (p.ej. código HTTP o tipo de excepción)." },
+                "resolution": { "enum": ["DIRECTA", "INDIRECTA", "DINAMICA", "NO_RESUELTA"] },
+                "evidence_id": { "type": "string" }
+              }
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "from", "to", "kind"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string" },
+                "from": { "type": "string" },
+                "to": { "type": "string" },
+                "kind": { "enum": ["next", "true", "false", "case", "default", "exception", "loop_body", "loop_exit"] },
+                "condition": { "type": "string" }
+              }
+            }
+          },
+          "evidence": { "type": "array", "items": { "$ref": "evidence.schema.json" } },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "kind", "node_ids", "terminal"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string" },
+                "kind": { "enum": ["success", "rejection", "error", "unknown"] },
+                "node_ids": { "type": "array", "items": { "type": "string" } },
+                "terminal": { "type": "string" }
+              }
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["description"],
+              "additionalProperties": false,
+              "properties": { "description": { "type": "string" }, "node_id": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

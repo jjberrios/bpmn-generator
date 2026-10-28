@@ -1,0 +1,43 @@
+# Dependencias y entornos locales
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE, sistema y archivos temporales
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.bak
+~$*
+coverage/
+.nyc_output/
+
+# Secretos: usar ejemplos sin valores reales
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Datos privados y resultados; conservar las carpetas vacías
+/inputs/projects/*
+!/inputs/projects/.gitkeep
+/workspace/*
+!/workspace/.gitkeep
+/outputs/*
+!/outputs/.gitkeep
+
+# inputs/references/ y tests/fixtures/ se versionan intencionalmente.
+# No excluir globalmente ZIP, BPM, PNG o DOCX.

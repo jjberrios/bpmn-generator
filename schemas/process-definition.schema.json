@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bpmn-reverse-engineer.local/schemas/process-definition.schema.json",
+  "title": "Definición de proceso",
+  "description": "Modelo intermedio entre el análisis y el generador BPMN. Los LLM producen este JSON; el XML BPMN lo genera exclusivamente la herramienta determinista.",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "description", "entry_point", "abstraction_level", "scope_note", "participants", "activities", "events", "decisions", "flows", "outcomes", "exceptions", "evidence", "uncertainties", "review_status"],
+  "additionalProperties": false,
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+    "evidenceIds": { "type": "array", "items": { "type": "string" } }
+  },
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "$ref": "#/$defs/id" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "entry_point": {
+      "type": "object",
+      "required": ["class", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "entry_point_id": { "type": "string" },
+        "kind": { "type": "string" },
+        "http_method": { "type": "string" },
+        "path": { "type": "string" },
+        "class": { "type": "string" },
+        "method": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer" },
+        "trace_id": { "type": "string" }
+      }
+    },
+    "abstraction_level": { "enum": ["FUNCIONAL", "BACKEND_OBSERVABLE", "DETALLADO"] },
+    "scope_note": { "type": "string", "description": "Alcance explícito. Si solo se modela comportamiento observable del backend, debe indicarse aquí." },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind", "justification", "evidence_ids"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["internal", "external", "data_store"] },
+          "is_pool": { "type": "boolean", "description": "Solo para kind=internal: true marca el pool principal (exactamente uno); false/ausente es un carril (lane) del pool principal. kind=external genera un pool colapsado (caja negra) enlazado por flujos de mensaje. kind=data_store genera un DataStoreReference." },
+          "justification": { "type": "string" },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+        }
+      }
+    },
+    "activities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type", "participant_id", "description", "evidence_ids", "evidence_status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["task", "serviceTask", "sendTask", "receiveTask", "scriptTask", "subProcess"] },
+          "participant_id": { "type": "string" },
+          "description": { "type": "string" },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+          "evidence_status": { "enum": ["CONFIRMADA", "INFERIDA", "DESCONOCIDA"] },
+          "trace_nodes": { "type": "array", "items": { "type": "string" } },
+          "data_access": {
+            "type": "array",
+            "description": "Acceso de la actividad a almacenes de datos (participantes kind=data_store).",
+            "items": {
+              "type": "object",
+              "required": ["data_store_id", "access"],
+              "additionalProperties": false,
+              "properties": { "data_store_id": { "type": "string" }, "access": { "enum": ["read", "write"] } }
+            }
+          },
+          "message_target_participant_id": { "type": "string" }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type", "participant_id", "evidence_ids", "evidence_status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "type": "string" },
+          "type": { "enum": ["start", "end", "intermediate_catch", "intermediate_throw"] },
+          "definition": { "enum": ["none", "error", "message", "timer", "terminate"] },
+          "participant_id": { "type": "string" },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+          "evidence_status": { "enum": ["CONFIRMADA", "INFERIDA", "DESCONOCIDA"] },
+          "trace_node": { "type": "string" },
+          "outcome": { "type": "string" }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "gateway", "participant_id", "condition_text", "evidence_ids", "evidence_status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "type": "string" },
+          "gateway": { "enum": ["exclusive", "parallel", "inclusive"] },
+          "participant_id": { "type": "string" },
+          "condition_text": { "type": "string", "description": "Expresión literal del código que decide." },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+          "evidence_status": { "enum": ["CONFIRMADA", "INFERIDA", "DESCONOCIDA"] },
+          "trace_node": { "type": "string" },
+          "default_flow_id": { "type": "string" }
+        }
+      }
+    },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "name": { "type": "string", "description": "Etiqueta visible (p.ej. SI / NO)." },
+          "condition": { "type": "string", "description": "Condición literal de salida, obligatoria en las salidas de una compuerta exclusiva o inclusiva salvo la predeterminada." },
+          "branch": { "enum": ["true", "false", "case", "default", "exception", "next"], "description": "Rama de la traza que representa." },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+        }
+      }
+    },
+    "message_flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "name": { "type": "string" },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+        }
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind", "event_id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["success", "rejection", "error", "unknown"] },
+          "event_id": { "type": "string" },
+          "http_status": { "type": "string" }
+        }
+      }
+    },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "evidence_ids"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "exception_type": { "type": "string" },
+          "description": { "type": "string" },
+          "handled_by": { "type": "string" },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+        }
+      }
+    },
+    "related_processes": {
+      "type": "array",
+      "items": { "type": "object", "required": ["process_id", "relation"], "additionalProperties": false, "properties": { "process_id": { "type": "string" }, "relation": { "type": "string" } } }
+    },
+    "evidence": { "type": "array", "items": { "$ref": "evidence.schema.json" } },
+    "uncertainties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "description": { "type": "string" },
+          "element_ids": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["INFERIDA", "DESCONOCIDA"] }
+        }
+      }
+    },
+    "review_status": {
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["PENDIENTE", "APROBADO", "APROBADO_CON_OBSERVACIONES", "RECHAZADO"] },
+        "report": { "type": "string" },
+        "reviewed_by": { "type": "string" }
+      }
+    }
+  }
+}

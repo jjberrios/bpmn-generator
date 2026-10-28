@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:orders
+    username: sa
+    password: fake-password-for-tests
+shipping:
+  base-url: http://shipping.internal/api

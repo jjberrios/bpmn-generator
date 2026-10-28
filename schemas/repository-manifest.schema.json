@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bpmn-reverse-engineer.local/schemas/repository-manifest.schema.json",
+  "title": "Manifiesto del repositorio",
+  "description": "Resultado de la ingesta segura de un ZIP (project-ingestion).",
+  "type": "object",
+  "required": ["schema_version", "project_id", "source", "extracted_root", "limits", "files", "excluded", "sensitive_files", "totals", "warnings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "project_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "source": {
+      "type": "object",
+      "required": ["name", "sha256", "size_bytes"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "extracted_root": { "type": "string" },
+    "limits": {
+      "type": "object",
+      "required": ["max_files", "max_total_bytes", "max_file_bytes", "max_ratio", "max_depth"],
+      "additionalProperties": false,
+      "properties": {
+        "max_files": { "type": "integer" },
+        "max_total_bytes": { "type": "integer" },
+        "max_file_bytes": { "type": "integer" },
+        "max_ratio": { "type": "number" },
+        "max_depth": { "type": "integer" }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256", "language", "category"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "language": { "type": "string" },
+          "category": { "enum": ["source", "test", "config", "build", "documentation", "resource", "other"] }
+        }
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "description": "Entradas del ZIP no extraídas (binarios, irrelevantes, rechazadas por seguridad).",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" },
+          "kind": { "enum": ["irrelevante", "binario", "seguridad", "limite", "duplicado"] }
+        }
+      }
+    },
+    "sensitive_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" },
+          "extracted": { "type": "boolean" }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["entries_in_zip", "files_extracted", "bytes_extracted", "files_excluded"],
+      "additionalProperties": false,
+      "properties": {
+        "entries_in_zip": { "type": "integer" },
+        "files_extracted": { "type": "integer" },
+        "bytes_extracted": { "type": "integer" },
+        "files_excluded": { "type": "integer" }
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}
