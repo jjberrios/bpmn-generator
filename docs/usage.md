@@ -26,7 +26,7 @@ node tools/cli.mjs analyze servicio
 node tools/cli.mjs discover servicio
 node tools/cli.mjs draft servicio --process <process_id|--all>
 node tools/cli.mjs generate servicio --process <process_id> | --all
-node tools/cli.mjs validate-bpmn outputs/<id>/diagrams/<pid>.bpmn
+node tools/cli.mjs validate-bpmn workspace/<id>/_intermedios/diagrams/<pid>.bpmn
 node tools/cli.mjs review-check servicio --process <pid>
 node tools/cli.mjs validate-schema <contrato> <archivo.json>
 node tools/cli.mjs inspect-reference [inputs/references/claro-post-consultareclamos.bpm]
@@ -42,21 +42,21 @@ Salida siempre JSON. Códigos de salida: 0 correcto, 1 bloqueado/rechazado, 2 er
 
 | Archivo | Contenido |
 |---|---|
-| `outputs/<id>/diagrams/<pid>.bpmn` | BPMN 2.0 editable con BPMN DI |
-| `outputs/<id>/diagrams/<pid>.process.json` | Definición del proceso (modelo intermedio) |
-| `outputs/<id>/diagrams/<pid>.traceability.json` | Elemento BPMN → evidencias (archivo, línea, estado) |
-| `outputs/<id>/documents/<pid>.docx` | Word editable: ficha por actividad funcional, con tablas según las imágenes de referencia |
-| `outputs/<id>/documents/<pid>.documentation.json` | Datos de las fichas, evidencias, huellas y controles estructurales del Word |
-| `outputs/<id>/previews/<pid>.svg/.png` | Vista previa renderizada desde el DI |
-| `outputs/<id>/reports/<pid>.validation.json/.md` | Informe de validación |
-| `outputs/<id>/reports/<pid>.review.json/.md` | Informe de revisión (hallazgos e inferencias no confirmadas) |
-| `outputs/<id>/reports/<id>-descubrimiento.md` | Candidatos a proceso |
-| `outputs/<id>/reports/<id>-informe-final.md` | Informe consolidado |
-| `outputs/<id>/traces/<pid>.trace.json` | Traza de ejecución usada |
+| `workspace/<id>/_intermedios/diagrams/<pid>.bpmn` | BPMN 2.0 editable con BPMN DI |
+| `workspace/<id>/_intermedios/diagrams/<pid>.process.json` | Definición del proceso (modelo intermedio) |
+| `workspace/<id>/_intermedios/diagrams/<pid>.traceability.json` | Elemento BPMN → evidencias (archivo, línea, estado) |
+| `workspace/<id>/_intermedios/documents/<pid>.docx` | Word editable: ficha por actividad funcional, con tablas según las imágenes de referencia |
+| `workspace/<id>/_intermedios/documents/<pid>.documentation.json` | Datos de las fichas, evidencias, huellas y controles estructurales del Word |
+| `workspace/<id>/_intermedios/previews/<pid>.svg/.png` | Vista previa renderizada desde el DI |
+| `workspace/<id>/_intermedios/reports/<pid>.validation.json/.md` | Informe de validación |
+| `workspace/<id>/_intermedios/reports/<pid>.review.json/.md` | Informe de revisión (hallazgos e inferencias no confirmadas) |
+| `workspace/<id>/_intermedios/reports/<id>-descubrimiento.md` | Candidatos a proceso |
+| `workspace/<id>/_intermedios/reports/<id>-informe-final.md` | Informe consolidado |
+| `workspace/<id>/_intermedios/traces/<pid>.trace.json` | Traza de ejecución usada |
 
 ## Entrega
 
-El entregable principal es `outputs/<id>/diagrams/<pid>.bpmn`. Con `--bpm` también se genera `outputs/<id>/delivery/<id>.bpm`. Cada generación crea el Word de actividades en `outputs/<id>/documents/`; `node tools/cli.mjs document <id> --all` permite actualizar solo los documentos desde los BPMN ya generados y las fichas `activity-documentation.json` preparadas con evidencia del código. Sin fichas, los datos no determinados no se inventan.
+`outputs/<id>/` es una carpeta plana con solo `<pid>.bpmn`, `<id>.bpm` (con `--bpm`) y los Word; los archivos listados arriba (JSON, previews, reportes, trazas) se escriben en `workspace/<id>/_intermedios/`. Cada generación crea el Word de actividades en `workspace/<id>/_intermedios/documents/`; `node tools/cli.mjs document <id> --all` permite actualizar solo los documentos desde los BPMN ya generados y las fichas `activity-documentation.json` preparadas con evidencia del código. Sin fichas, los datos no determinados no se inventan.
 
 ## Depuración y repetición
 

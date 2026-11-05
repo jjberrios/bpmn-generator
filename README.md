@@ -26,7 +26,7 @@ Para generar solo un proceso o validar un BPMN:
 
 ```text
 /bpmn-generate inputs/projects/servicio.zip --process <process_id>
-/bpmn-validate outputs/<id>/diagrams/<process_id>.bpmn
+/bpmn-validate workspace/<id>/_intermedios/diagrams/<process_id>.bpmn
 ```
 
 El orquestador delega automáticamente; no necesitas abrir cada subagente:

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
+import { workDir, publishDeliverables } from './layout-paths.mjs';
 import { ROOT, assertId, review, exportNativeProject, finalReport } from './pipeline.mjs';
 import { checkAbstraction, definitionHash } from './validation/abstraction-checks.mjs';
 import { validateContract } from './validation/schema-validator.mjs';
@@ -33,11 +34,11 @@ export function functionalReviewContext(projectId, processIds, { root = ROOT } =
 // Reconstruye el informe de la entrega vigente, no el de los intermedios técnicos anteriores.
 export function functionalReportResults(projectId, processIds, { root = ROOT } = {}) {
   assertId(projectId, 'project-id');
-  const output = path.join(root, 'outputs', projectId, 'functional');
+  const output = path.join(workDir(root, projectId), 'functional');
   const manifestFile = path.join(output, `${projectId}.manifest.json`);
   if (!fs.existsSync(manifestFile)) return null;
   const manifest = read(manifestFile);
-  const delivery = path.join(root, 'outputs', projectId, 'delivery', `${projectId}.bpm`);
+  const delivery = path.join(workDir(root, projectId), 'delivery', `${projectId}.bpm`);
   if (manifest.blocked || !manifest.native_project || !fs.existsSync(delivery)) return null;
   const actual = createHash('sha256').update(fs.readFileSync(delivery)).digest('hex');
   if (actual !== manifest.native_project.sha256) return null;
@@ -82,7 +83,7 @@ export async function generateFunctional(projectId, processIds, { root = ROOT } 
     }
     return { processId, definition, mapping, abstraction, receipt };
   });
-  const output = path.join(root, 'outputs', projectId, 'functional');
+  const output = path.join(workDir(root, projectId), 'functional');
   fs.mkdirSync(output, { recursive: true });
   const results = [];
   let pending = false;
@@ -120,5 +121,6 @@ export async function generateFunctional(projectId, processIds, { root = ROOT } 
   const report = finalReport(projectId, results, { root });
   const manifest = { project_id: projectId, view: 'POR_ACTIVIDADES', pending_independent_review: pending, blocked, native_project: native, report, generated: results.map((r) => ({ process_id: r.process_id, activities: r.definition.activities.length, decisions: r.definition.decisions.length, events: r.definition.events.length, validation: r.validation.approval, review: r.review.verdict, files: r.files })) };
   json(path.join(output, `${projectId}.manifest.json`), manifest);
+  if (!blocked) manifest.published = publishDeliverables(root, projectId);
   return manifest;
 }

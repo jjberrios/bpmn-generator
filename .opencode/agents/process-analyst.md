@@ -34,6 +34,7 @@ Refina el borrador determinista hacia un proceso funcional claro:
 - Eventos: inicio por el punto de entrada; **un evento final por resultado observable** (p. ej. 200, 400, 404, 502), con `outcome`.
 - Participantes: un pool principal (el servicio), lanes por responsabilidad con evidencia (clase/capa), pools externos colapsados solo para servicios realmente invocados. Nada de pools/lanes decorativos.
 - Subprocesos solo cuando aporten claridad; evita diagramas enormes o excesivamente técnicos.
+- **Nivel funcional, no por método**: organiza el diagrama por funcionalidad e insumos (entradas, validaciones agrupadas, consultas a datos, llamadas externas, resultados). Validaciones, guardas, formateos, logs y retornos de métodos auxiliares se agrupan en una sola actividad `INFERIDA` con nombre de negocio; nunca una tarea por validación ni por "Retorno anticipado". Objetivo: ≤ ~25 actividades y ≤ ~12 decisiones; conserva solo decisiones que cambian el resultado o la ruta.
 - Registra `uncertainties` (llamadas no resueltas, inferencias) y `exceptions`; elementos sin evidencia suficiente → `DESCONOCIDA` (nunca CONFIRMADA).
 - `scope_note`: si no hay proceso de negocio completo, indica expresamente que se modela solo el comportamiento backend observable. No inventes pasos de usuario, aprobaciones ni tareas manuales.
 - No inventes líneas ni snippets: toda evidencia debe existir tal cual en `source/`.

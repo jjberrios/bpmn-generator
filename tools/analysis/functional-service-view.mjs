@@ -1,28 +1,51 @@
-// Vista única de actividades funcionales del servicio, derivada de forma determinista de la definición detallada.
-// No inventa comportamiento: agrupa operaciones técnicas, conserva decisiones de negocio, resultados finales y toda
+// Vista Ãºnica de actividades funcionales del servicio, derivada de forma determinista de la definiciÃ³n detallada.
+// No inventa comportamiento: agrupa operaciones tÃ©cnicas, conserva decisiones de negocio, resultados finales y toda
 // llamada a repositorio/base de datos (como actividad del carril del servicio).
 import { normalizeGateways } from './normalize-gateways.mjs';
 import { refineDefinition } from './refine-definition.mjs';
 
-const strip = (s) => String(s ?? '').replace(/[¿?]/g, '').replace(/\s+/g, ' ').trim();
+const strip = (s) => String(s ?? '').replace(/[Â¿?]/g, '').replace(/\s+/g, ' ').trim();
 const laneRole = (p) => (/controlador|controller|recurso|resource|\bapi\b|rest/i.test(p.name) ? 'controller' : /servicio|service|negocio|domain/i.test(p.name) ? 'service' : 'infra');
 const union = (...lists) => [...new Set(lists.flat().filter(Boolean))];
 const unnumber = (s) => String(s ?? '').replace(/^\s*\d+\s*[.)-]\s*/, '').trim();
 
-// Nombre funcional corto: sin paréntesis, códigos HTTP, tokens de código (con '.', '(', '/') ni detalle tras ';' o ':'.
+// Nombre funcional corto: sin parÃ©ntesis, cÃ³digos HTTP, tokens de cÃ³digo (con '.', '(', '/') ni detalle tras ';' o ':'.
 export function short(s, max = 60) {
   let t = String(s ?? '').replace(/\([^)]*\)/g, ' ').replace(/\bHTTP\s*\d{3}\b;?/gi, ' ').replace(/codigoRespuesta/gi, ' ');
-  const question = /^\s*¿/.test(t);
+  const question = /^\s*Â¿/.test(t);
   t = t.split(/[;:]/)[0];
-  t = t.split(/\s+/).filter((w) => w && !/[./(){}[\]]/.test(w.replace(/[.,]$/, ''))).join(' ').replace(/[¿?]/g, '').replace(/[,.]\s*$/, '').trim();
+  t = t.split(/\s+/).filter((w) => w && !/[./(){}[\]]/.test(w.replace(/[.,]$/, ''))).join(' ').replace(/[Â¿?]/g, '').replace(/[,.]\s*$/, '').trim();
   if (!t) t = 'Actividad';
-  if (t.length > max) { t = t.slice(0, max); t = `${t.slice(0, Math.max(t.lastIndexOf(' '), 20)).trim()}…`; }
+  if (t.length > max) { t = t.slice(0, max); t = `${t.slice(0, Math.max(t.lastIndexOf(' '), 20)).trim()}â€¦`; }
   t = t.charAt(0).toUpperCase() + t.slice(1);
-  return question ? `¿${t}?` : t;
+  return question ? `Â¿${t}?` : t;
+}
+
+const ACCENTS = [[/parametros/gi, 'parÃ¡metros'], [/codigo/gi, 'cÃ³digo'], [/numero/gi, 'nÃºmero'], [/telefono/gi, 'telÃ©fono'], [/categoria/gi, 'categorÃ­a'], [/linea/gi, 'lÃ­nea'], [/(\w)cion\b/gi, '$1ciÃ³n'], [/(\w)sion\b/gi, '$1siÃ³n']];
+const NOISE = /^(escribirLog|log\w*|checkStr|check\w*|format\w*|get\w*|set\w*|is\w*|create\w*|execute|call|to\w+|map\w*|build\w*|agregar\w*|obtenerValor\w*)$/;
+export function humanize(method) {
+  let t = String(method ?? '').split('.').pop().replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  for (const [re, to] of ACCENTS) t = t.replace(re, to);
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 export function functionalServiceView(detail, opts = {}) {
   const nameOv = opts.names || {};
+  const traceNum = (t) => Number(String(t).replace(/\D/g, '')) || 0;
+  const traceNodesOf = (o) => (o.trace_node ? [o.trace_node] : o.trace_nodes || []);
+  const methodsOfSet = (set, { strict = true } = {}) => {
+    if (!opts.methodOf) return [];
+    const pairs = [];
+    for (const o of [...detail.activities, ...detail.decisions, ...detail.events]) {
+      if (!set.has(o.id)) continue;
+      for (const tn of traceNodesOf(o)) { const m = opts.methodOf(tn); if (m) pairs.push([traceNum(tn), m]); }
+    }
+    pairs.sort((a, b) => a[0] - b[0]);
+    const uniq = [...new Set(pairs.map((p) => p[1]))];
+    const good = uniq.filter((m) => !NOISE.test(m.split('.').pop()));
+    return strict ? good : (good.length ? good : uniq);
+  };
+  opts.methodsOf = opts.methodsOf || methodsOfSet;
   const def = structuredClone(detail);
   const N = new Map();
   for (const a of def.activities) N.set(a.id, { t: 'activity', o: a });
@@ -52,8 +75,8 @@ export function functionalServiceView(detail, opts = {}) {
   for (const f of F) if (f.branch === 'exception') excIn.set(f.to, (excIn.get(f.to) || 0) + 1);
   const hasTF = (id) => out(id).some((f) => ['true', 'false', 'case'].includes(f.branch));
 
-  // 1-2. Compuertas de excepción: se omiten; las salidas de excepción de las de negocio se retiran.
-  // Se registra el origen real (quién lanza) y el manejador (a dónde va) para dibujarlo después.
+  // 1-2. Compuertas de excepciÃ³n: se omiten; las salidas de excepciÃ³n de las de negocio se retiran.
+  // Se registra el origen real (quiÃ©n lanza) y el manejador (a dÃ³nde va) para dibujarlo despuÃ©s.
   const excEdges = [];
   for (const d of [...def.decisions]) {
     if (!N.has(d.id)) continue;
@@ -73,20 +96,20 @@ export function functionalServiceView(detail, opts = {}) {
     bypass(d.id, normal.to);
   }
 
-  // 2b. Final de excepción propagada (HTTP desconocido) que solo se alcanzaba por corredores de excepción: se omite del diagrama
-  // funcional y se informa en map.omitted_outcomes (la excepción se conserva en la definición detallada y en las incertidumbres).
+  // 2b. Final de excepciÃ³n propagada (HTTP desconocido) que solo se alcanzaba por corredores de excepciÃ³n: se omite del diagrama
+  // funcional y se informa en map.omitted_outcomes (la excepciÃ³n se conserva en la definiciÃ³n detallada y en las incertidumbres).
   const omittedOutcomes = [];
   for (const e of def.events.filter((x) => x.type === 'end' && (x.evidence_status === 'DESCONOCIDA' || /propagad/i.test(x.name)))) {
     if (!N.has(e.id)) continue;
     for (let i = excEdges.length - 1; i >= 0; i--) if (excEdges[i].to === e.id) excEdges.splice(i, 1);
     if (inn(e.id).length) continue;
     const oc = (def.outcomes || []).find((o) => o.event_id === e.id);
-    omittedOutcomes.push({ event_id: e.id, outcome_id: oc?.id || null, reason: 'Excepción propagada con estado HTTP desconocido: solo se alcanza por corredores de excepción técnicos; se conserva en la definición detallada.' });
+    omittedOutcomes.push({ event_id: e.id, outcome_id: oc?.id || null, reason: 'ExcepciÃ³n propagada con estado HTTP desconocido: solo se alcanza por corredores de excepciÃ³n tÃ©cnicos; se conserva en la definiciÃ³n detallada.' });
     remove(e.id);
     omitted.add(e.id);
   }
 
-  // 3. Uniones y compuertas sin bifurcación; compuertas sin entradas.
+  // 3. Uniones y compuertas sin bifurcaciÃ³n; compuertas sin entradas.
   let changed = true;
   while (changed) {
     changed = false;
@@ -97,43 +120,92 @@ export function functionalServiceView(detail, opts = {}) {
     }
   }
 
-  // 4. Decisiones sin efecto diferenciado: se agrupan en una actividad funcional.
-  const sinkOf = (n) => { let x = n, guard = 0; while (synthetic.has(x) && out(x).length === 1 && guard++ < 50) x = out(x)[0].to; return x; };
+  // 4. Regiones de decisiÃ³n sin efecto funcional diferenciado (validaciones, formateos, guardas tÃ©cnicas):
+  // si todas las ramas de una decisiÃ³n convergen en un Ãºnico paso significativo (acceso a datos, llamada externa,
+  // resultado final, comportamiento desconocido o uniÃ³n compartida) y no contienen nada significativo, toda la
+  // regiÃ³n se agrupa en una actividad funcional (INFERIDA). Las decisiones que sÃ­ cambian el resultado se conservan.
+  const significant = (id) => {
+    const n = N.get(id);
+    if (!n) return true;
+    if (n.t === 'event') return true;
+    if (n.t === 'decision') return false;
+    const a = n.o;
+    return isData(id) || a.evidence_status === 'DESCONOCIDA' || !!a.message_target_participant_id || a.type === 'serviceTask' || a.type === 'sendTask' || /^Manejar\b/.test(a.name);
+  };
+  const orderFromStart = () => {
+    const st = [...N.values()].filter((n) => n.t === 'event' && n.o.type === 'start').map((n) => n.o.id);
+    const order = [], q = [...st], mark = new Set();
+    while (q.length) { const x = q.shift(); if (mark.has(x) || !N.has(x)) continue; mark.add(x); order.push(x); for (const f of out(x)) q.push(f.to); }
+    for (const k of N.keys()) if (!mark.has(k)) order.push(k);
+    return order;
+  };
+  const findRegion = (d) => {
+    const bfs = [], seenB = new Set([d]), q = out(d).map((f) => f.to);
+    while (q.length) { const x = q.shift(); if (seenB.has(x) || !N.has(x)) continue; seenB.add(x); bfs.push(x); for (const f of out(x)) q.push(f.to); }
+    const sinkAvoiding = (c) => {
+      const seen = new Set([d, c]), st = out(d).map((f) => f.to);
+      while (st.length) {
+        const x = st.pop();
+        if (seen.has(x) || !N.has(x)) continue;
+        seen.add(x);
+        const o = out(x);
+        if (!o.length) return true;
+        for (const f of o) st.push(f.to);
+      }
+      return false;
+    };
+    let P = null;
+    for (const c of bfs.slice(0, 600)) if (!sinkAvoiding(c)) { P = c; break; }
+    if (!P) return null;
+    const R = new Set(), st = out(d).map((f) => f.to);
+    while (st.length) {
+      const x = st.pop();
+      if (x === d || x === P || R.has(x) || !N.has(x)) continue;
+      R.add(x);
+      for (const f of out(x)) st.push(f.to);
+    }
+    if ([...R].some((x) => significant(x) || inn(x).some((f) => f.from !== d && !R.has(f.from)))) return null;
+    return { R, P };
+  };
+  const regionName = (set) => {
+    const ms = opts.methodsOf ? opts.methodsOf(set) : [];
+    return ms.length ? ms.slice(0, 2).map(humanize).join(' y ') : '';
+  };
   changed = true;
   while (changed) {
     changed = false;
-    for (const d of def.decisions) {
-      if (!N.has(d.id) || !isDec(d.id)) continue;
-      const outs = out(d.id);
-      if (outs.length < 2) continue;
-      const sinks = outs.map((f) => sinkOf(f.to));
-      if (new Set(sinks).size !== 1 || sinks[0] === d.id) continue;
-      const T = sinks[0];
-      const inter = new Set();
-      for (const f of outs) { let x = f.to; while (x !== T && synthetic.has(x)) { inter.add(x); x = out(x)[0].to; } }
-      const members = new Set([d.id, ...inter]);
-      if ([...inter].some((m) => inn(m).some((f) => !members.has(f.from)))) continue;
-      const id = uid(`AF_${d.id}`);
-      const group = [d.o ?? N.get(d.id).o, ...[...inter].map((m) => N.get(m).o)];
+    for (const d of orderFromStart()) {
+      if (!N.has(d) || !isDec(d) || out(d).length < 2) continue;
+      const reg = findRegion(d);
+      if (!reg) continue;
+      const T = reg.P;
+      const members = new Set([d, ...reg.R]);
+      if ([...members].some((m) => out(m).some((f) => f.to !== T && !members.has(f.to)))) continue;
+      const id = uid(`AF_${d}`);
+      const group = [...members].map((m) => N.get(m).o);
+      const allCover = new Set([...members].flatMap((m) => [...coverOf(m)]));
       const conds = group.map((g) => g.condition_text || g.description).filter(Boolean);
+      const nm = regionName(allCover) || `Evaluar ${group.filter((g) => N.get(g.id)?.t === 'decision').map((g) => strip(g.name)).slice(0, 2).join(' / ')}`;
       const act = {
-        id, name: `Evaluar ${group.map((g) => strip(g.name)).filter(Boolean).join(' / ').slice(0, 110)}`, type: 'task', participant_id: N.get(d.id).o.participant_id,
-        description: `Evaluación sin efecto diferenciado en la estructura del flujo. Condiciones: ${conds.join('; ')}.`,
+        id, name: nm, type: 'task', participant_id: N.get(d).o.participant_id,
+        description: `Agrupa decisiones y pasos tÃ©cnicos sin efecto diferenciado en el flujo funcional. Condiciones: ${conds.slice(0, 12).join('; ')}${conds.length > 12 ? ' â€¦' : ''}.`.slice(0, 1500),
         evidence_ids: union(...group.map((g) => g.evidence_ids || [])), evidence_status: 'INFERIDA',
         trace_nodes: union(...group.map((g) => (g.trace_node ? [g.trace_node] : g.trace_nodes || []))),
       };
+      const ins = inn(d).filter((f) => !members.has(f.from));
       N.set(id, { t: 'activity', o: act });
       synthetic.add(id);
       names.set(id, [act.name]);
-      cover.set(id, new Set([...members].flatMap((m) => [...coverOf(m)])));
-      for (const f of inn(d.id)) f.to = id;
-      for (const m of members) { F = F.filter((f) => f.from !== m); N.delete(m); }
+      cover.set(id, allCover);
+      for (const f of ins) f.to = id;
+      for (const m of members) { F = F.filter((f) => f.from !== m); N.delete(m); if (m !== d) omitted.add(m); }
+      F = F.filter((f) => !(f.to === d || members.has(f.to)));
       F.push({ id: uid(`FV_${id}`), from: id, to: T, branch: 'next', evidence_ids: act.evidence_ids });
       changed = true;
     }
   }
 
-  // 5. Absorción de pasos técnicos de infraestructura en la actividad de acceso a datos y fusión de tramos lineales.
+  // 5. AbsorciÃ³n de pasos tÃ©cnicos de infraestructura en la actividad de acceso a datos y fusiÃ³n de tramos lineales.
   const parts = new Map(def.participants.map((p) => [p.id, p]));
   const lanes = def.participants.filter((p) => p.kind === 'internal' && !p.is_pool);
   const pool = def.participants.find((p) => p.kind === 'internal' && p.is_pool);
@@ -189,7 +261,7 @@ export function functionalServiceView(detail, opts = {}) {
     }
   }
 
-  // 5b. Actividades de "armar respuesta" cuya única salida es un final: se absorben en el resultado (nombre funcional del final).
+  // 5b. Actividades de "armar respuesta" cuya Ãºnica salida es un final: se absorben en el resultado (nombre funcional del final).
   const isEnd = (id) => N.get(id)?.t === 'event' && N.get(id).o.type === 'end';
   const ovName = (id) => {
     if (nameOv[id]) return nameOv[id];
@@ -234,7 +306,65 @@ export function functionalServiceView(detail, opts = {}) {
     }
   }
 
-  // 6. Corredores de excepción: una sola compuerta agrupada hacia los manejadores que quedaron sin entrada.
+  // 5d. Cadenas de validaciÃ³n (guardas): decisiones consecutivas cuya rama de rechazo (pasos tÃ©cnicos lineales)
+  // termina en el mismo final se agrupan en una sola decisiÃ³n de validaciÃ³n; el detalle queda en cobertura y descripciÃ³n.
+  const linearStep = (id) => isAct(id) && !isData(id) && mergeable(id) && inn(id).length === 1 && out(id).length === 1;
+  const guardOf = (d) => {
+    if (!isDec(d) || N.get(d).o.gateway === 'parallel') return null;
+    const outs = out(d);
+    if (outs.length !== 2) return null;
+    const sides = outs.map((f, i) => {
+      const chain = [];
+      let cur = f.to;
+      while (linearStep(cur)) { chain.push(cur); cur = out(cur)[0].to; }
+      return { f, other: outs[1 - i], chain, end: isEnd(cur) && inn(cur).length > 0 ? cur : null };
+    });
+    const errs = sides.filter((s) => s.end);
+    if (errs.length !== 1) return null;
+    return { err: errs[0], cont: errs[0].other };
+  };
+  for (const head of orderFromStart()) {
+    if (!N.has(head)) continue;
+    const g0 = guardOf(head);
+    if (!g0) continue;
+    const guards = [head], extra = [], errChains = [...g0.err.chain], errFlows = [g0.err.f.id];
+    const E = g0.err.end;
+    let cur = g0.cont.to, curFlow = g0.cont;
+    for (;;) {
+      let nxt = cur;
+      const pass = [];
+      while (linearStep(nxt) && guardOf(out(nxt)[0].to)?.err.end === E && inn(out(nxt)[0].to).length === 1) { pass.push(nxt); nxt = out(nxt)[0].to; }
+      const g = guardOf(nxt);
+      if (!g || g.err.end !== E || inn(nxt).length !== 1 || guards.includes(nxt)) break;
+      guards.push(nxt); extra.push(...pass); errChains.push(...g.err.chain);
+      curFlow = g.cont; cur = curFlow.to;
+    }
+    if (guards.length < 2) continue;
+    const members = [...guards, ...extra, ...errChains];
+    const group = members.map((m) => N.get(m).o);
+    const id = uid(`D_VAL_${head}`);
+    const conds = group.map((x) => x.condition_text).filter(Boolean);
+    const gate = {
+      id, name: 'Â¿Cumple las validaciones previas?', gateway: 'exclusive', participant_id: N.get(head).o.participant_id,
+      condition_text: `Agrupa validaciones consecutivas con el mismo resultado de rechazo: ${conds.slice(0, 12).join('; ')}${conds.length > 12 ? ' â€¦' : ''}`.slice(0, 1500),
+      evidence_ids: union(...group.map((x) => x.evidence_ids || [])), evidence_status: 'INFERIDA',
+    };
+    const headTrace = N.get(head).o.trace_node;
+    if (headTrace) gate.trace_node = headTrace;
+    const ins = inn(head);
+    const contTo = curFlow.to;
+    const allCover = new Set(members.flatMap((m) => [...coverOf(m)]));
+    N.set(id, { t: 'decision', o: gate });
+    cover.set(id, allCover);
+    for (const f of ins) f.to = id;
+    for (const m of members) { F = F.filter((f) => f.from !== m); N.delete(m); omitted.add(m); }
+    F = F.filter((f) => !members.includes(f.to));
+    const ok = { id: uid(`FV_${id}_OK`), from: id, to: contTo, branch: 'default', name: 'SÃ', evidence_ids: gate.evidence_ids };
+    F.push(ok, { id: uid(`FV_${id}_KO`), from: id, to: E, branch: 'false', name: 'NO', condition: 'alguna validaciÃ³n previa no se cumple', evidence_ids: gate.evidence_ids });
+    gate.default_flow_id = ok.id;
+  }
+
+  // 6. Corredores de excepciÃ³n: una sola compuerta agrupada hacia los manejadores que quedaron sin entrada.
   const starts = [...N.values()].filter((n) => n.t === 'event' && n.o.type === 'start').map((n) => n.o.id);
   const reach = (from) => { const seen = new Set(); const st = [...from]; while (st.length) { const x = st.pop(); if (seen.has(x) || !N.has(x)) continue; seen.add(x); for (const f of out(x)) st.push(f.to); } return seen; };
   let seen = reach(starts);
@@ -252,11 +382,11 @@ export function functionalServiceView(detail, opts = {}) {
     for (const [s, targets] of bySrc) {
       const so = N.get(s);
       if (!so) continue;
-      const cond = (t) => `excepción capturada o propagada que conduce a: ${strip(N.get(t).o.name)}`;
+      const cond = (t) => `excepciÃ³n capturada o propagada que conduce a: ${strip(N.get(t).o.name)}`;
       if (so.t === 'activity' && out(s).length === 1) {
         const a = so.o, e0 = out(s)[0];
         const id = uid(`D_EXC_${s}`);
-        const gate = { id, name: `¿Falla ${strip(a.name).slice(0, 70)}?`, gateway: 'exclusive', participant_id: a.participant_id, condition_text: `Excepción durante: ${strip(a.name)}`, evidence_ids: [...a.evidence_ids], evidence_status: 'INFERIDA' };
+        const gate = { id, name: `Â¿Falla ${strip(a.name).slice(0, 70)}?`, gateway: 'exclusive', participant_id: a.participant_id, condition_text: `ExcepciÃ³n durante: ${strip(a.name)}`, evidence_ids: [...a.evidence_ids], evidence_status: 'INFERIDA' };
         N.set(id, { t: 'decision', o: gate });
         excGateSrc.set(id, s);
         const next = e0.to;
@@ -268,7 +398,7 @@ export function functionalServiceView(detail, opts = {}) {
         cover.set(id, new Set());
         excGateIds.push(id);
       } else if (so.t === 'decision') {
-        for (const t of targets) if (N.has(t)) F.push({ id: uid(`FV_${s}_${t}`), from: s, to: t, branch: 'exception', name: 'EXCEPCIÓN', condition: cond(t), evidence_ids: [...(N.get(t).o.evidence_ids || [])] });
+        for (const t of targets) if (N.has(t)) F.push({ id: uid(`FV_${s}_${t}`), from: s, to: t, branch: 'exception', name: 'EXCEPCIÃ“N', condition: cond(t), evidence_ids: [...(N.get(t).o.evidence_ids || [])] });
       }
     }
     seen = reach(starts);
@@ -284,8 +414,8 @@ export function functionalServiceView(detail, opts = {}) {
       const a = N.get(anchor).o;
       const id = uid('D_FUNC_EXC');
       excGate = {
-        id, name: '¿Falla el procesamiento?', gateway: 'exclusive', participant_id: a.participant_id,
-        condition_text: 'Excepción capturada o propagada durante el procesamiento (agrupa los corredores try/catch del detalle)',
+        id, name: 'Â¿Falla el procesamiento?', gateway: 'exclusive', participant_id: a.participant_id,
+        condition_text: 'ExcepciÃ³n capturada o propagada durante el procesamiento (agrupa los corredores try/catch del detalle)',
         evidence_ids: [...a.evidence_ids], evidence_status: 'INFERIDA',
       };
       N.set(id, { t: 'decision', o: excGate });
@@ -296,7 +426,7 @@ export function functionalServiceView(detail, opts = {}) {
       F.push(normal);
       excGate.default_flow_id = normal.id;
       for (const en of entries) {
-        F.push({ id: uid(`FV_${id}_${en}`), from: id, to: en, branch: 'exception', name: 'SI', condition: `excepción que conduce a: ${strip(N.get(en).o.name)}`, evidence_ids: [...(N.get(en).o.evidence_ids || [])] });
+        F.push({ id: uid(`FV_${id}_${en}`), from: id, to: en, branch: 'exception', name: 'SI', condition: `excepciÃ³n que conduce a: ${strip(N.get(en).o.name)}`, evidence_ids: [...(N.get(en).o.evidence_ids || [])] });
       }
       cover.set(id, new Set());
     }
@@ -309,38 +439,40 @@ export function functionalServiceView(detail, opts = {}) {
   for (const [id, list] of names) {
     const o = N.get(id)?.o;
     if (!o || list.length < 2) continue;
+    const fnName = opts.methodsOf(coverOf(id)).slice(0, 2).map(humanize).join(' y ');
     if (isData(id)) {
       const dataName = (detail.activities.find((a) => a.id === [...coverOf(id)].find((c) => detail.activities.some((x) => x.id === c && (x.data_access || []).length)))?.name) || list[0];
-      o.name = dataName;
+      o.name = fnName || dataName;
       o.description = `Llamada al repositorio/base de datos. Agrupa: ${list.map(strip).join('; ')}. ${o.description}`.slice(0, 1500);
     } else if (!synthetic.has(id)) {
       const uniq = [...new Set(list.map(strip))];
-      o.name = uniq.slice(0, 3).join('; ') + (uniq.length > 3 ? ' …' : '');
+      o.name = fnName || (uniq.slice(0, 3).join('; ') + (uniq.length > 3 ? ' â€¦' : ''));
       o.description = `Agrupa: ${uniq.join('; ')}. ${o.description}`.slice(0, 1500);
     }
     if (isData(id)) o.type = 'serviceTask';
   }
   for (const n of N.values()) if (n.t === 'activity' && (n.o.data_access || []).length) n.o.participant_id = serviceLane.id;
 
-  // 7b. Nombres funcionales cortos (el detalle técnico queda en la descripción, la definición y la trazabilidad).
+  // 7b. Nombres funcionales cortos (el detalle tÃ©cnico queda en la descripciÃ³n, la definiciÃ³n y la trazabilidad).
   {
     const order = [], q = [...starts], mark = new Set();
     while (q.length) { const x = q.shift(); if (mark.has(x) || !N.has(x)) continue; mark.add(x); order.push(x); for (const f of out(x)) q.push(f.to); }
     for (const k of N.keys()) if (!mark.has(k)) order.push(k);
     let num = 0;
-    const note = (o, old) => { if (old && old !== o.name && !String(o.description || '').includes(old)) o.description = `${o.description || ''} Detalle técnico: ${old}.`.trim().slice(0, 1500); };
+    const note = (o, old) => { if (old && old !== o.name && !String(o.description || '').includes(old)) o.description = `${o.description || ''} Detalle tÃ©cnico: ${old}.`.trim().slice(0, 1500); };
     for (const id of order) {
       const node = N.get(id);
       if (!node) continue;
       const o = node.o, old = o.name;
       if (node.t === 'activity') {
-        const base = ovName(id) || short(unnumber(old));
+        const unres = o.evidence_status === 'DESCONOCIDA' && /Invocar\s+([\w.]+)\(\)/.exec(old);
+        const base = ovName(id) || (unres ? `Invocar ${unres[1].split('.').pop()} (no resuelto)` : short(unnumber(old)));
         o.name = /^\d/.test(base) ? base : `${++num}. ${base}`;
       } else if (node.t === 'decision') {
         const src = excGateSrc.get(id);
         if (nameOv[id]) o.name = nameOv[id];
-        else if (src && N.get(src)) { const b = short(unnumber(N.get(src).o.name)); o.name = `¿Error en ${b.charAt(0).toLowerCase()}${b.slice(1)}?`; }
-        else o.name = ovName(id) || short(old);
+        else if (src && N.get(src)) { const b = short(unnumber(N.get(src).o.name)); o.name = `Â¿Error en ${b.charAt(0).toLowerCase()}${b.slice(1)}?`; }
+        else o.name = ovName(id) || (/^[Â¿]?Actividad\??$/.test(short(old)) ? `Â¿Cumple la condiciÃ³n de ${humanize((opts.methodsOf(coverOf(id), { strict: false })[0]) || 'la validaciÃ³n').toLowerCase()}?` : short(old));
       } else if (o.type === 'end') o.name = finalName(id);
       else o.name = ovName(id) || short(old);
       if (node.t === 'activity') note(o, old);
@@ -375,16 +507,16 @@ export function functionalServiceView(detail, opts = {}) {
       return true;
     });
   }
-  if (omittedOutcomes.length) def.uncertainties.push({ id: uid('U_FUNC_PROPAGADA'), status: 'DESCONOCIDA', element_ids: [], description: 'Excepciones no absorbidas que salen del servicio (estado HTTP desconocido, sin manejador propio identificado) no se dibujan como final de la vista funcional; se conservan en la definición detallada y en sus excepciones.' });
+  if (omittedOutcomes.length) def.uncertainties.push({ id: uid('U_FUNC_PROPAGADA'), status: 'DESCONOCIDA', element_ids: [], description: 'Excepciones no absorbidas que salen del servicio (estado HTTP desconocido, sin manejador propio identificado) no se dibujan como final de la vista funcional; se conservan en la definiciÃ³n detallada y en sus excepciones.' });
   def.message_flows = (def.message_flows || []).filter((m) => (N.has(m.from) || parts.has(m.from)) && (N.has(m.to) || parts.has(m.to)));
   const covering = new Map();
   for (const [vid, set] of cover) if (N.has(vid)) for (const c of set) covering.set(c, [...(covering.get(c) || []), vid]);
   for (const u of def.uncertainties) u.element_ids = union(...(u.element_ids || []).map((x) => (N.has(x) ? [x] : covering.get(x) || [])));
-  if (excGate) def.uncertainties.push({ id: uid('U_FUNC_EXC'), status: 'INFERIDA', element_ids: [excGate.id], description: 'Las excepciones del detalle técnico (try/catch por método) se agrupan en una sola compuerta; no indica el punto exacto donde ocurre cada una. El detalle completo se conserva en la definición y la traza.' });
-  if (excGateIds.length) def.uncertainties.push({ id: uid('U_FUNC_EXC_SRC'), status: 'INFERIDA', element_ids: [...excGateIds], description: 'Compuertas de excepción deducidas de los corredores try/catch del detalle: conectan cada actividad con su manejador; no son predicados de negocio ni prueban que la excepción ocurra. Los pasos técnicos intermedios están agrupados.' });
+  if (excGate) def.uncertainties.push({ id: uid('U_FUNC_EXC'), status: 'INFERIDA', element_ids: [excGate.id], description: 'Las excepciones del detalle tÃ©cnico (try/catch por mÃ©todo) se agrupan en una sola compuerta; no indica el punto exacto donde ocurre cada una. El detalle completo se conserva en la definiciÃ³n y la traza.' });
+  if (excGateIds.length) def.uncertainties.push({ id: uid('U_FUNC_EXC_SRC'), status: 'INFERIDA', element_ids: [...excGateIds], description: 'Compuertas de excepciÃ³n deducidas de los corredores try/catch del detalle: conectan cada actividad con su manejador; no son predicados de negocio ni prueban que la excepciÃ³n ocurra. Los pasos tÃ©cnicos intermedios estÃ¡n agrupados.' });
   const kept = new Set(N.keys());
   for (const x of def.exceptions) if (x.handled_by && !kept.has(x.handled_by)) delete x.handled_by;
-  def.scope_note = `${def.scope_note || ''} Vista de actividades funcionales del servicio derivada de la definición detallada: las llamadas a repositorio y base de datos se muestran como actividades del servicio; logs, cierres de recursos, uniones y corredores de excepción técnicos se agrupan.`.trim();
+  def.scope_note = `${def.scope_note || ''} Vista de actividades funcionales del servicio derivada de la definiciÃ³n detallada: las llamadas a repositorio y base de datos se muestran como actividades del servicio; logs, cierres de recursos, uniones y corredores de excepciÃ³n tÃ©cnicos se agrupan.`.trim();
 
   const map = Object.fromEntries([...cover].filter(([k]) => N.has(k)).map(([k, v]) => [k, [...v]]));
   const covered = new Set(Object.values(map).flat());
@@ -399,14 +531,15 @@ export function checkFunctionalCoverage(detail, view, map) {
   const coveredBy = new Map();
   for (const [vid, list] of Object.entries(map.covers)) if (viewIds.has(vid)) for (const c of list) coveredBy.set(c, vid);
   const omittedEv = new Set((map.omitted_outcomes || []).map((o) => o.event_id));
-  for (const e of detail.events.filter((x) => x.type === 'end')) if (!viewIds.has(e.id) && !coveredBy.has(e.id) && !omittedEv.has(e.id)) errors.push({ code: 'FINAL_OMITIDO', element_id: e.id, message: `El resultado final ${e.id} no está en la vista.` });
+  for (const e of detail.events.filter((x) => x.type === 'end')) if (!viewIds.has(e.id) && !coveredBy.has(e.id) && !omittedEv.has(e.id)) errors.push({ code: 'FINAL_OMITIDO', element_id: e.id, message: `El resultado final ${e.id} no estÃ¡ en la vista.` });
   for (const a of detail.activities.filter((x) => (x.data_access || []).length)) {
     const v = view.activities.find((x) => x.id === coveredBy.get(a.id));
     if (!v || !(v.data_access || []).some((d) => a.data_access.some((o) => o.data_store_id === d.data_store_id))) errors.push({ code: 'LLAMADA_BD_OMITIDA', element_id: a.id, message: `La llamada a base de datos ${a.id} no aparece como actividad de la vista.` });
   }
   for (const d of detail.decisions) {
     const outs = detail.flows.filter((f) => f.from === d.id);
-    if (outs.some((f) => ['true', 'false', 'case'].includes(f.branch)) && !coveredBy.has(d.id)) errors.push({ code: 'DECISION_OMITIDA', element_id: d.id, message: `La decisión ${d.id} no está cubierta por la vista.` });
+    // Una decisiÃ³n con una sola salida no bifurca (la vista la absorbe, igual que las uniones); no es una decisiÃ³n omitida.
+    if (outs.length >= 2 && outs.some((f) => ['true', 'false', 'case'].includes(f.branch)) && !coveredBy.has(d.id)) errors.push({ code: 'DECISION_OMITIDA', element_id: d.id, message: `La decisiÃ³n ${d.id} no estÃ¡ cubierta por la vista.` });
   }
   return { valid: !errors.length, errors, coverage: { detail_nodes: detail.activities.length + detail.decisions.length + detail.events.length, view_nodes: viewIds.size } };
 }

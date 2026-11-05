@@ -1,4 +1,4 @@
-"""Reconstrucción de rutas de ejecución (execution-trace) desde cada punto de entrada.
+﻿"""Reconstrucción de rutas de ejecución (execution-trace) desde cada punto de entrada.
 
 Estrategia: se recorre el AST del método de entrada y se inlinan las invocaciones resolubles estáticamente
 (proyecto), generando un grafo de nodos/aristas con evidencia (archivo, líneas, fragmento literal).
@@ -16,8 +16,8 @@ from java_index import (
 )
 
 MAX_DEPTH = 8
-MAX_NODES = 600
-MAX_PATHS = 300
+MAX_NODES = 3000
+MAX_PATHS = 2000
 
 EXTERNAL_HTTP_TYPES = {"RestTemplate", "TestRestTemplate", "WebClient", "RestClient", "HttpClient", "OkHttpClient", "CloseableHttpClient", "WebServiceTemplate"}
 JDBC_TYPES = {"JdbcTemplate", "NamedParameterJdbcTemplate", "JdbcOperations", "EntityManager", "SimpleJdbcCall", "SimpleJdbcInsert", "DSLContext", "CallableStatement", "OracleCallableStatement", "PreparedStatement", "Statement"}

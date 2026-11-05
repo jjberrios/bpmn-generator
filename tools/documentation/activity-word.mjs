@@ -1,6 +1,7 @@
 // WordprocessingML editable: tablas inspiradas en inputs/references/word, sin ejecutar fuentes.
 import fs from 'node:fs';
 import path from 'node:path';
+import { workDir } from '../layout-paths.mjs';
 import { createHash } from 'node:crypto';
 import { zipSync, strToU8, unzipSync, strFromU8 } from 'fflate';
 import { XMLValidator, XMLParser } from 'fast-xml-parser';
@@ -79,7 +80,7 @@ export function validateActivityDocx(bytes, activityCount) {
 export function generateActivityWord(projectId, processId, { root, definition } = {}) {
   const safe = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/;
   if (!safe.test(projectId) || !safe.test(processId)) throw new Error('Identificador de proyecto/proceso inválido.');
-  const base = path.join(root, 'outputs', projectId, 'diagrams', processId);
+  const base = path.join(workDir(root, projectId), 'diagrams', processId);
   const def = definition || JSON.parse(fs.readFileSync(`${base}.process.json`, 'utf8'));
   if (fs.existsSync(`${base}.bpmn`)) {
     const tasks = [];
@@ -92,11 +93,16 @@ export function generateActivityWord(projectId, processId, { root, definition } 
         }
       }
     };
-    visit(new XMLParser({ ignoreAttributes: false }).parse(fs.readFileSync(`${base}.bpmn`, 'utf8')));
+    // processEntities:false + decodificación en una sola pasada: bpmn-moddle serializa «&», «>» como &#38;/&#62;
+    // y el parser por defecto no decodifica entidades numéricas, lo que rompía la comparación de nombres.
+    const named = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
+    const decode = (s) => (typeof s === 'string' ? s.replace(/&(#x[0-9a-fA-F]+|#\d+|lt|gt|amp|quot|apos);/g, (m, e) => (e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : named[e])) : s);
+    visit(new XMLParser({ ignoreAttributes: false, processEntities: false }).parse(fs.readFileSync(`${base}.bpmn`, 'utf8')));
+    for (const t of tasks) t.name = decode(t.name);
     if (tasks.length !== def.activities.length || def.activities.some((a) => !tasks.some((t) => t.id === a.id && t.name === a.name))) throw new Error('Las fichas no corresponden a las actividades del BPMN final.');
   }
   if (!definition) {
-    const reports = path.join(root, 'outputs', projectId, 'reports');
+    const reports = path.join(workDir(root, projectId), 'reports');
     const validation = JSON.parse(fs.readFileSync(path.join(reports, `${processId}.validation.json`), 'utf8'));
     const review = JSON.parse(fs.readFileSync(path.join(reports, `${processId}.review.json`), 'utf8'));
     if (validation.approval !== 'APROBADO' || review.verdict === 'RECHAZADO') throw new Error('Word bloqueado: el BPMN requiere validación aprobada y revisión no rechazada.');
@@ -115,7 +121,7 @@ export function generateActivityWord(projectId, processId, { root, definition } 
   }
   const { bytes, fichas } = buildActivityDocx(def, annotations);
   const validation = validateActivityDocx(bytes, def.activities.length);
-  const folder = path.join(root, 'outputs', projectId, 'documents');
+  const folder = path.join(workDir(root, projectId), 'documents');
   fs.mkdirSync(folder, { recursive: true });
   const annotationsHash = sha(JSON.stringify(annotations));
   const latestFile = path.join(folder, `${processId}.latest.json`);
@@ -143,16 +149,16 @@ export function generateActivityWord(projectId, processId, { root, definition } 
 // Solo enlazar documentos que correspondan al diagrama y a sus actividades actuales.
 export function currentActivityWord(projectId, processId, { root } = {}) {
   if (![projectId, processId].every((id) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/.test(id))) throw new Error('Identificador inválido.');
-  const folder = path.join(root, 'outputs', projectId, 'documents');
+  const folder = path.join(workDir(root, projectId), 'documents');
   const latest = path.join(folder, `${processId}.latest.json`);
   if (!fs.existsSync(latest)) return { approval: 'PENDIENTE', content_status: 'PENDIENTE' };
   const result = JSON.parse(fs.readFileSync(latest, 'utf8'));
-  const reportDir = path.join(root, 'outputs', projectId, 'reports');
+  const reportDir = path.join(workDir(root, projectId), 'reports');
   for (const [suffix, key, rejected] of [['validation', 'approval', 'BLOQUEADO'], ['review', 'verdict', 'RECHAZADO']]) {
     const report = path.join(reportDir, `${processId}.${suffix}.json`);
     if (fs.existsSync(report) && JSON.parse(fs.readFileSync(report, 'utf8'))[key] === rejected) return { approval: 'BLOQUEADO', content_status: 'PENDIENTE' };
   }
-  const base = path.join(root, 'outputs', projectId, 'diagrams', processId);
+  const base = path.join(workDir(root, projectId), 'diagrams', processId);
   const doc = path.resolve(root, result.file);
   const inside = path.relative(folder, doc);
   if (inside.startsWith('..') || path.isAbsolute(inside)) return { approval: 'DESACTUALIZADO' };

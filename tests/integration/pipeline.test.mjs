@@ -60,7 +60,7 @@ test('sin --bpm el entregable es el BPMN 2.0 por proceso y no se exporta el cont
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(r.json.native_project, null);
   for (const pid of ['OrderController_getStatus', 'OrderController_cancel']) {
-    const xml = read(`outputs/${PID}/diagrams/${pid}.bpmn`);
+    const xml = read(`workspace/${PID}/_intermedios/diagrams/${pid}.bpmn`);
     assert.match(xml, /http:\/\/www\.omg\.org\/spec\/BPMN\/20100524\/MODEL/);
     assert.match(xml, /BPMNDiagram/);
   }
@@ -70,23 +70,26 @@ test('el pipeline entrega un único .bpm nativo con todos los diagramas y el CLI
   assert.equal(run.status, 0, run.stdout + run.stderr);
   assert.equal(run.json.native_project.diagrams.length, 2);
   assert.equal(run.json.native_project.approval, 'APROBADO');
-  const result = cli('validate-bizagi', `outputs/${PID}/delivery/${PID}.bpm`);
+  const result = cli('validate-bizagi', `workspace/${PID}/_intermedios/delivery/${PID}.bpm`);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.equal(result.json.diagrams.length, 2);
   assert.equal(result.json.bizagi_compatibility, undefined);
-  assert.match(read(`outputs/${PID}/reports/${PID}-informe-final.md`), /Opcional:\*\* `outputs\/orders-service\/delivery/);
+  assert.match(read(`workspace/${PID}/_intermedios/reports/${PID}-informe-final.md`), /Opcional:\*\* `outputs\/orders-service\/orders-service\.bpm/);
+  const published = fs.readdirSync(path.join(ROOT, `outputs/${PID}`), { withFileTypes: true });
+  assert.ok(published.every((e) => e.isFile() && /\.(bpm|bpmn|docx)$/.test(e.name)), published.map((e) => e.name).join(", "));
+  assert.ok(published.some((e) => e.name === `${PID}.bpm`) && published.some((e) => e.name.endsWith(".bpmn")));
 });
 
 test('el informe solo muestra la carga del proveedor correspondiente al hash de la entrega', () => {
-  const providerFile = path.join(ROOT, `outputs/${PID}/reports/${PID}.bizagi-provider-load.json`);
+  const providerFile = path.join(ROOT, `workspace/${PID}/_intermedios/reports/${PID}.bizagi-provider-load.json`);
   const previous = fs.existsSync(providerFile) ? fs.readFileSync(providerFile) : null;
   const results = run.json.generated.map(({ process_id, files }) => ({
     process_id, files,
-    definition: readJson(`outputs/${PID}/diagrams/${process_id}.process.json`),
-    validation: readJson(`outputs/${PID}/reports/${process_id}.validation.json`),
-    review: readJson(`outputs/${PID}/reports/${process_id}.review.json`),
+    definition: readJson(`workspace/${PID}/_intermedios/diagrams/${process_id}.process.json`),
+    validation: readJson(`workspace/${PID}/_intermedios/reports/${process_id}.validation.json`),
+    review: readJson(`workspace/${PID}/_intermedios/reports/${process_id}.review.json`),
   }));
-  const reportFile = `outputs/${PID}/reports/${PID}-informe-final.md`;
+  const reportFile = `workspace/${PID}/_intermedios/reports/${PID}-informe-final.md`;
   try {
     const provider = { approval: 'APROBADO', mode: 'load', sha256: run.json.native_project.sha256,
       diagrams: [{ collaboration_loaded: true }, { collaboration_loaded: true }] };
@@ -104,7 +107,7 @@ test('el informe solo muestra la carga del proveedor correspondiente al hash de 
 });
 
 test('rutas principales y alternativas de getStatus reconstruidas en el modelo', () => {
-  const def = readJson(`outputs/${PID}/diagrams/OrderController_getStatus.process.json`);
+  const def = readJson(`workspace/${PID}/_intermedios/diagrams/OrderController_getStatus.process.json`);
   const outcomes = def.outcomes.map((o) => o.name).sort();
   assert.deepEqual(outcomes, ['200 OK', '400 BAD_REQUEST', '404 NOT_FOUND', '502 BAD_GATEWAY']);
   const conds = def.decisions.map((d) => d.condition_text);
@@ -114,31 +117,31 @@ test('rutas principales y alternativas de getStatus reconstruidas en el modelo',
   assert.ok(def.participants.some((p) => p.kind === 'external'), 'servicio externo como participante');
   assert.ok(def.participants.some((p) => p.kind === 'data_store'), 'almacén de datos');
   assert.ok(def.uncertainties.length >= 1, 'la llamada no resoluble debe figurar como incertidumbre');
-  const cancel = readJson(`outputs/${PID}/diagrams/OrderController_cancel.process.json`);
+  const cancel = readJson(`workspace/${PID}/_intermedios/diagrams/OrderController_cancel.process.json`);
   assert.deepEqual(cancel.outcomes.map((o) => o.name).sort(), ['204 NO_CONTENT', '404 NOT_FOUND', '409 CONFLICT']);
 });
 
 test('se generan archivos .bpmn reales con BPMN DI, validación y vistas previas', () => {
   for (const pid of ['OrderController_getStatus', 'OrderController_cancel']) {
-    const xml = read(`outputs/${PID}/diagrams/${pid}.bpmn`);
+    const xml = read(`workspace/${PID}/_intermedios/diagrams/${pid}.bpmn`);
     assert.match(xml, /<bpmn:definitions|<definitions/);
     assert.match(xml, /BPMNDiagram/);
     assert.match(xml, /BPMNShape/);
     assert.match(xml, /BPMNEdge/);
     assert.match(xml, /<dc:Bounds|<omgdc:Bounds/);
-    const v = readJson(`outputs/${PID}/reports/${pid}.validation.json`);
+    const v = readJson(`workspace/${PID}/_intermedios/reports/${pid}.validation.json`);
     assert.equal(v.approval, 'APROBADO');
     assert.equal(v.summary.errors, 0);
     assert.equal(v.bizagi_compatibility, undefined);
-    assert.ok(fs.statSync(path.join(ROOT, `outputs/${PID}/previews/${pid}.svg`)).size > 1000);
-    assert.ok(fs.statSync(path.join(ROOT, `outputs/${PID}/previews/${pid}.png`)).size > 1000);
-    const side = readJson(`outputs/${PID}/diagrams/${pid}.traceability.json`);
+    assert.ok(fs.statSync(path.join(ROOT, `workspace/${PID}/_intermedios/previews/${pid}.svg`)).size > 1000);
+    assert.ok(fs.statSync(path.join(ROOT, `workspace/${PID}/_intermedios/previews/${pid}.png`)).size > 1000);
+    const side = readJson(`workspace/${PID}/_intermedios/diagrams/${pid}.traceability.json`);
     assert.ok(Object.keys(side).length >= 5);
   }
 });
 
 test('trazabilidad: cada actividad BPMN enlaza a líneas reales del código fuente', () => {
-  const side = readJson(`outputs/${PID}/diagrams/OrderController_getStatus.traceability.json`);
+  const side = readJson(`workspace/${PID}/_intermedios/diagrams/OrderController_getStatus.traceability.json`);
   const src = path.join(ROOT, 'workspace', PID, 'source');
   let checked = 0;
   for (const entry of Object.values(side)) {
@@ -152,10 +155,10 @@ test('trazabilidad: cada actividad BPMN enlaza a líneas reales del código fuen
 });
 
 test('la revisión y el informe final distinguen evidencia confirmada, inferida y desconocida', () => {
-  const review = readJson('outputs/orders-service/reports/OrderController_getStatus.review.json');
+  const review = readJson('workspace/orders-service/_intermedios/reports/OrderController_getStatus.review.json');
   assert.equal(validateContract('review-report', review).valid, true);
   assert.ok(review.unconfirmed_inferences.length >= 1);
-  const final = read(`outputs/${PID}/reports/${PID}-informe-final.md`);
+  const final = read(`workspace/${PID}/_intermedios/reports/${PID}-informe-final.md`);
   assert.match(final, /CONFIRMADA/);
   assert.match(final, /DESCONOCIDA/);
   assert.match(final, /Fidelidad funcional: no verificada/);
@@ -173,7 +176,7 @@ test('discover lista candidatos sin generar diagramas', () => {
 test('generate acepta un proceso concreto por nombre de método', () => {
   const r = cli('generate', PID, '--process', 'cancel');
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.ok(fs.existsSync(path.join(ROOT, `outputs/${PID}/diagrams/OrderController_cancel.bpmn`)));
+  assert.ok(fs.existsSync(path.join(ROOT, `workspace/${PID}/_intermedios/diagrams/OrderController_cancel.bpmn`)));
 });
 
 test('generate reutiliza una definición refinada sin reconstruir el borrador', () => {
@@ -205,9 +208,9 @@ test('vista por actividades: no entrega sin revisión independiente ni acepta un
     outcomes: source.outcomes.map((o) => ({ target_id: o.id, source_outcome_ids: [o.id], description: o.name })) };
   const files = ['functional-definition.json', 'abstraction-map.json', 'functional-review.json'];
   const saved = files.map((f) => fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f)) : null);
-  const delivery = path.join(ROOT, `outputs/${PID}/delivery/${PID}.bpm`);
+  const delivery = path.join(ROOT, `workspace/${PID}/_intermedios/delivery/${PID}.bpm`);
   const previousDelivery = fs.readFileSync(delivery);
-  const nativeReport = path.join(ROOT, `outputs/${PID}/reports/${PID}.bizagi-validation.json`);
+  const nativeReport = path.join(ROOT, `workspace/${PID}/_intermedios/reports/${PID}.bizagi-validation.json`);
   const previousNativeReport = fs.readFileSync(nativeReport);
   try {
     fs.writeFileSync(path.join(dir, files[0]), JSON.stringify(source));
@@ -222,7 +225,7 @@ test('vista por actividades: no entrega sin revisión independiente ni acepta un
     assert.equal(preview.native_project, null);
     assert.deepEqual(fs.readFileSync(delivery), previousDelivery);
     fs.writeFileSync(path.join(dir, files[2]), JSON.stringify({ view_sha256: '0'.repeat(64), source_sha256: definitionHash(source), map_sha256: definitionHash(mapping) }));
-    const previewFile = path.join(ROOT, `outputs/${PID}/functional/${id}.process.json`);
+    const previewFile = path.join(ROOT, `workspace/${PID}/_intermedios/functional/${id}.process.json`);
     const previousPreview = fs.readFileSync(previewFile);
     await assert.rejects(generateFunctional(PID, [id]), /Revisión funcional obsoleta/);
     assert.deepEqual(fs.readFileSync(previewFile), previousPreview, 'Una revisión obsoleta no sustituye previews previas.');
@@ -238,8 +241,8 @@ test('vista por actividades: no entrega sin revisión independiente ni acepta un
     const refreshed = cli('report', PID, '--process', 'cancel');
     assert.equal(refreshed.status, 0, refreshed.stderr);
     assert.equal(refreshed.json.view, 'POR_ACTIVIDADES');
-    assert.match(read(`outputs/${PID}/reports/${PID}-informe-final.md`), /Vista por actividades/);
-    assert.match(read(`outputs/${PID}/reports/${PID}-informe-final.md`), /outputs\/orders-service\/functional\/OrderController_cancel/);
+    assert.match(read(`workspace/${PID}/_intermedios/reports/${PID}-informe-final.md`), /Vista por actividades/);
+    assert.match(read(`workspace/${PID}/_intermedios/reports/${PID}-informe-final.md`), /workspace\/orders-service\/_intermedios\/functional\/OrderController_cancel/);
   } finally {
     fs.writeFileSync(delivery, previousDelivery);
     fs.writeFileSync(nativeReport, previousNativeReport);
@@ -248,13 +251,13 @@ test('vista por actividades: no entrega sin revisión independiente ni acepta un
 });
 
 test('validate-bpmn por CLI aprueba el BPMN generado y bloquea uno alterado', () => {
-  const ok = cli('validate-bpmn', `outputs/${PID}/diagrams/OrderController_cancel.bpmn`);
+  const ok = cli('validate-bpmn', `workspace/${PID}/_intermedios/diagrams/OrderController_cancel.bpmn`);
   assert.equal(ok.status, 0);
   assert.equal(ok.json.approval, 'APROBADO');
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bpmn-re-val-'));
   const bad = path.join(tmp, 'roto.bpmn');
-  fs.writeFileSync(bad, read(`outputs/${PID}/diagrams/OrderController_cancel.bpmn`).replace(/targetRef="[^"]+"/, 'targetRef="NO_EXISTE"'));
+  fs.writeFileSync(bad, read(`workspace/${PID}/_intermedios/diagrams/OrderController_cancel.bpmn`).replace(/targetRef="[^"]+"/, 'targetRef="NO_EXISTE"'));
   const r = cli('validate-bpmn', bad);
   assert.equal(r.status, 1);
   assert.equal(r.json.approval, 'BLOQUEADO');

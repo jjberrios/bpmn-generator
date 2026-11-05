@@ -128,12 +128,12 @@ export function renderFinalReport({ projectId, manifest, architecture, candidate
   out.push(table(['ID', 'Nombre', 'Entrada', 'Rutas', 'Evidencia suficiente'], candidates.map((c) => [c.process_id, c.name, `${c.entry_point.class}.${c.entry_point.method}`, c.paths, c.evidence_sufficiency])));
   out.push('## 2. Procesos generados\n');
   if (processes.length) {
-    out.push(`**Entregable principal:** un archivo BPMN 2.0 (\`.bpmn\`, con BPMN DI) por proceso en \`outputs/${projectId}/diagrams/\`:\n`);
-    for (const p of processes) out.push(`- \`outputs/${projectId}/diagrams/${p.process_id ?? p.definition.id}.bpmn\``);
+    out.push(`**Entregable principal:** un archivo BPMN 2.0 (\`.bpmn\`, con BPMN DI) por proceso en \`outputs/${projectId}/\`:\n`);
+    for (const p of processes) out.push(`- \`outputs/${projectId}/${p.process_id ?? p.definition.id}.bpmn\``);
     out.push('');
   }
   if (nativeProject) {
-    out.push(`**Opcional:** \`${nativeProject.file}\` — ${nativeProject.diagrams.length} diagramas en un contenedor Bizagi .bpm (paquetes XPDL 2.2).`);
+    out.push(`**Opcional:** \`outputs/${projectId}/${projectId}.bpm\` — ${nativeProject.diagrams.length} diagramas en un contenedor Bizagi .bpm (paquetes XPDL 2.2).`);
     out.push(`- Comprobaciones del contenedor: ${nativeProject.approval}; informe: \`${nativeProject.validation_report}\`.`);
     out.push('- Conserva los BPMN, vistas previas y trazas como intermedios. No es un ZIP de archivos BPMN renombrado.');
     out.push('');
@@ -199,8 +199,8 @@ export function renderFinalReport({ projectId, manifest, architecture, candidate
     out.push(`  - Revisión registrada: ${p.review.reviewer} — ${p.review.verdict}.`);
   }
   out.push('\n## 6. Archivos generados\n');
-  out.push(processes.length ? `Archivos BPMN 2.0 por proceso en \`outputs/${projectId}/diagrams/\` (ver sección 2).` : 'No se generó ningún archivo BPMN.');
-  out.push(nativeProject ? `Contenedor .bpm opcional: \`${nativeProject.file}\`.` : 'Contenedor .bpm (opcional): no generado (use `--bpm`).');
+  out.push(processes.length ? `Archivos BPMN 2.0 por proceso en \`outputs/${projectId}/\` (ver sección 2).` : 'No se generó ningún archivo BPMN.');
+  out.push(nativeProject ? `Contenedor .bpm opcional: \`outputs/${projectId}/${projectId}.bpm\`.` : 'Contenedor .bpm (opcional): no generado (use `--bpm`).');
   out.push(`\nPrueba con el archivo de referencia: ${referenceStatus ?? 'no ejecutada'}.\n`);
   out.push('## 7. Confidencialidad\n');
   out.push('El código leído por los agentes se procesa mediante los proveedores LLM configurados en OpenCode. Los scripts locales no transmiten contenido a servicios externos.\n');

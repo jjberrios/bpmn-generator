@@ -68,3 +68,44 @@ test('la cobertura detecta una llamada a BD o un final omitidos', () => {
   assert.ok(codes.includes('LLAMADA_BD_OMITIDA'));
   assert.ok(codes.includes('FINAL_OMITIDO'));
 });
+
+test('colapsa una región de decisiones sin BD ni resultados propios en una actividad funcional', () => {
+  const detail = sample();
+  detail.activities.push(act('A_X1', 'L_C'), act('A_X2', 'L_C'), act('A_M', 'L_C'));
+  detail.decisions.push(dec('D_X', 'L_C'));
+  detail.activities = detail.activities.filter((a) => a.id !== 'A_IN');
+  detail.flows = detail.flows.filter((f) => f.id !== 'F1' && f.id !== 'F2');
+  detail.flows.push(
+    fl('G1', 'S', 'D_X', 'next'),
+    fl('G2', 'D_X', 'A_X1', 'true', { condition: 'c_D_X' }), fl('G3', 'D_X', 'A_X2', 'false'),
+    fl('G4', 'A_X1', 'A_M', 'next'), fl('G5', 'A_X2', 'A_M', 'next'), fl('G6', 'A_M', 'D_EXC1', 'next'),
+  );
+  assert.equal(validateContract('process-definition', detail).valid, true);
+  const { definition: view } = functionalServiceView(detail);
+  assert.deepEqual(checkDefinition(view).errors, []);
+  assert.equal(view.decisions.some((d) => d.id === 'D_X'), false);
+  assert.ok(view.activities.length < detail.activities.length + 3);
+  assert.ok(view.activities.some((a) => a.id.startsWith('AF_')));
+  assert.ok(view.decisions.some((d) => d.id === 'D_BIZ'));
+});
+
+test('agrupa validaciones consecutivas con el mismo rechazo en una sola decisión', () => {
+  const detail = sample();
+  detail.activities.push(act('A_R1', 'L_C'), act('A_R2', 'L_C'), act('A_R3', 'L_C'));
+  detail.decisions.push(dec('D_V1', 'L_C'), dec('D_V2', 'L_C'), dec('D_V3', 'L_C'));
+  detail.flows = detail.flows.filter((f) => f.id !== 'F2');
+  detail.flows.push(
+    fl('V0', 'A_IN', 'D_V1', 'next'),
+    fl('V1a', 'D_V1', 'A_R1', 'false', { condition: 'c_D_V1' }), fl('V1b', 'D_V1', 'D_V2', 'true'),
+    fl('V2a', 'D_V2', 'A_R2', 'false', { condition: 'c_D_V2' }), fl('V2b', 'D_V2', 'D_V3', 'true'),
+    fl('V3a', 'D_V3', 'A_R3', 'false', { condition: 'c_D_V3' }), fl('V3b', 'D_V3', 'D_EXC1', 'true'),
+    fl('R1', 'A_R1', 'END_KO', 'next'), fl('R2', 'A_R2', 'END_KO', 'next'), fl('R3', 'A_R3', 'END_KO', 'next'),
+  );
+  assert.equal(validateContract('process-definition', detail).valid, true);
+  const { definition: view, map } = functionalServiceView(detail);
+  assert.deepEqual(checkDefinition(view).errors, []);
+  assert.equal(validateContract('process-definition', view).valid, true);
+  assert.equal(view.decisions.filter((d) => /^D_VAL_/.test(d.id)).length, 1);
+  assert.equal(view.decisions.some((d) => ['D_V1', 'D_V2', 'D_V3'].includes(d.id)), false);
+  assert.equal(checkFunctionalCoverage(detail, view, map).valid, true);
+});

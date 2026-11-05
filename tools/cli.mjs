@@ -8,6 +8,7 @@ import {
   ROOT, UsageError, ingest, analyze, discover, resolveCandidates, draft, generate, review, validateBpmnPath,
   inspectReferenceFile, finalReport, pipeline, assertId, DEFAULT_REFERENCE, exportNativeProject, validateNativePath,
 } from './pipeline.mjs';
+import { workDir, publishDeliverables } from './layout-paths.mjs';
 import { validateContractFile, CONTRACTS } from './validation/schema-validator.mjs';
 import { readNativeStructure, analyzeReferenceStyle } from './reference/inspect-xpdl.mjs';
 import { diagnoseLoader, loadedFontReadable, loadedFontContrast } from './bizagi/diagnose-loader.mjs';
@@ -78,7 +79,8 @@ async function main(argv) {
   switch (cmd) {
     case 'document': {
       const id = assertId(positionals[0], 'project-id');
-      out({ documents: resolveCandidates(id, selectorOf(values)).map((c) => ({ ...generateActivityWord(id, c.process_id, { root: ROOT }), general: generateGeneralWord(id, c.process_id, { root: ROOT }) })) });
+      const documents = resolveCandidates(id, selectorOf(values)).map((c) => ({ ...generateActivityWord(id, c.process_id, { root: ROOT }), general: generateGeneralWord(id, c.process_id, { root: ROOT }) }));
+      out({ documents, published: publishDeliverables(ROOT, id) });
       return 0;
     }
     case 'relabel-functional': {
@@ -127,7 +129,7 @@ async function main(argv) {
       if (values['project-id']) {
         const id = assertId(values['project-id'], 'project-id');
         if (!loading) throw new UsageError('Solo se persisten diagnósticos de deserialización/carga.');
-        const file = `outputs/${id}/reports/${id}.bizagi-provider-${values.mode}.json`;
+        const file = `workspace/${id}/_intermedios/reports/${id}.bizagi-provider-${values.mode}.json`;
         const contrasts = items.flatMap((r) => (r.labels ?? []).map(loadedFontContrast));
         const report = { approval: blocked ? 'BLOQUEADO' : 'APROBADO', mode: values.mode, file: positionals[0], sha256: createHash('sha256').update(fs.readFileSync(positionals[0])).digest('hex'), generated_at: new Date().toISOString(), diagrams: items, ...(values.mode === 'load' ? { labels: { total: items.reduce((n, r) => n + (r.labels?.length ?? 0), 0), visible_area_and_names_preserved: items.every(visibleLabels), readable_fonts_and_opaque_contrast: items.every(readableFonts), minimum_contrast: contrasts.length ? Math.min(...contrasts) : null } } : {}), limitation: 'Carga del modelo y verificación de nombres, áreas, fuente, tamaño, opacidad y contraste con DLL del proveedor; no es una comprobación visual de la interfaz de Bizagi.' };
         fs.mkdirSync(path.dirname(path.join(ROOT, file)), { recursive: true });
@@ -173,7 +175,7 @@ async function main(argv) {
         summaries.push({ process_id: r.process_id, validation: r.validation.approval, review: r.review.verdict, errors: r.validation.summary.errors, warnings: r.validation.summary.warnings, documentation: r.documentation, files: r.files });
       }
       const nativeProject = values.bpm && !blocked && results.length ? exportNativeProject(id, results) : null;
-      out({ generated: summaries, native_project: nativeProject, bpmn_deliverable: summaries.map((s) => s.files) });
+      out({ generated: summaries, native_project: nativeProject, bpmn_deliverable: summaries.map((s) => s.files), published: blocked ? null : publishDeliverables(ROOT, id) });
       return blocked ? 1 : 0;
     }
     case 'validate-bizagi': {
@@ -251,10 +253,10 @@ async function main(argv) {
       }
       const results = [];
       for (const c of selected) {
-        const base = path.join(ROOT, 'outputs', id, 'diagrams', c.process_id);
+        const base = path.join(workDir(ROOT, id), 'diagrams', c.process_id);
         if (!fs.existsSync(`${base}.process.json`)) continue;
         const def = JSON.parse(fs.readFileSync(`${base}.process.json`, 'utf8'));
-        const rd = (n) => JSON.parse(fs.readFileSync(path.join(ROOT, 'outputs', id, 'reports', `${c.process_id}.${n}.json`), 'utf8'));
+        const rd = (n) => JSON.parse(fs.readFileSync(path.join(workDir(ROOT, id), 'reports', `${c.process_id}.${n}.json`), 'utf8'));
         const rel = (f) => path.relative(ROOT, f).split(path.sep).join('/');
         const documentation = currentActivityWord(id, c.process_id, { root: ROOT });
         documentation.general = currentGeneralWord(id, c.process_id, { root: ROOT });
@@ -264,9 +266,9 @@ async function main(argv) {
             bpmn: rel(`${base}.bpmn`), definicion: rel(`${base}.process.json`), trazabilidad: rel(`${base}.traceability.json`),
             ...(documentation.approval === 'APROBADO' ? { word: documentation.file } : {}),
             ...(documentation.general.approval === 'APROBADO' ? { word_general: documentation.general.file } : {}),
-            validacion: `outputs/${id}/reports/${c.process_id}.validation.json`, revision: `outputs/${id}/reports/${c.process_id}.review.json`,
-            ...Object.fromEntries(['svg', 'png'].filter((ext) => fs.existsSync(path.join(ROOT, 'outputs', id, 'previews', `${c.process_id}.${ext}`))).map((ext) => [ext, `outputs/${id}/previews/${c.process_id}.${ext}`])),
-            ...(fs.existsSync(path.join(ROOT, 'outputs', id, 'traces', `${c.process_id}.trace.json`)) ? { traza: `outputs/${id}/traces/${c.process_id}.trace.json` } : {}),
+            validacion: `workspace/${id}/_intermedios/reports/${c.process_id}.validation.json`, revision: `workspace/${id}/_intermedios/reports/${c.process_id}.review.json`,
+            ...Object.fromEntries(['svg', 'png'].filter((ext) => fs.existsSync(path.join(workDir(ROOT, id), 'previews', `${c.process_id}.${ext}`))).map((ext) => [ext, `workspace/${id}/_intermedios/previews/${c.process_id}.${ext}`])),
+            ...(fs.existsSync(path.join(workDir(ROOT, id), 'traces', `${c.process_id}.trace.json`)) ? { traza: `workspace/${id}/_intermedios/traces/${c.process_id}.trace.json` } : {}),
           },
         });
       }

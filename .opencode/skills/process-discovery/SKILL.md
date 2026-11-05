@@ -20,6 +20,7 @@ Modo DISCOVER (listar procesos) y paso previo a generar BPMN (definición de pro
 - Un evento final por resultado observable; ramas de error como flujos reales.
 - Sin pasos humanos, aprobaciones ni actividades inventadas; alcance `BACKEND_OBSERVABLE` cuando no haya proceso funcional completo.
 - Elementos agrupados o deducidos → `INFERIDA` con justificación; sin evidencia → `DESCONOCIDA`.
+- Nivel funcional, no por método: agrupar validaciones, retornos anticipados y mapeos técnicos en actividades de negocio según funcionalidad e insumos (entradas/BD/integraciones); diagrama compacto (≤~25 actividades, ≤~12 decisiones).
 - No convertir cada método Java en tarea; no duplicar lógica compartida entre procesos (usar `related_processes`).
 
 ## Salida / criterios de éxito

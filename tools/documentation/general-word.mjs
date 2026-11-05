@@ -1,6 +1,7 @@
 // Explicación funcional: únicamente del modelo final y de la interpretación documentada del código.
 import fs from 'node:fs';
 import path from 'node:path';
+import { workDir } from '../layout-paths.mjs';
 import { createHash } from 'node:crypto';
 import { buildNarrativeDocx, validateActivityDocx, currentActivityWord } from './activity-word.mjs';
 
@@ -10,8 +11,8 @@ const clean = (name) => name.replace(/^\d+\.\s*/, '');
 function locations(projectId, processId, root) {
   if (![projectId, processId].every((id) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/.test(id))) throw new Error('Identificador inválido.');
   return {
-    base: path.join(root, 'outputs', projectId, 'diagrams', processId),
-    folder: path.join(root, 'outputs', projectId, 'documents'),
+    base: path.join(workDir(root, projectId), 'diagrams', processId),
+    folder: path.join(workDir(root, projectId), 'documents'),
     narrative: path.join(root, 'workspace', projectId, 'processes', processId, 'process-explanation.json'),
   };
 }

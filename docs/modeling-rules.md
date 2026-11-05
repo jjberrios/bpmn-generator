@@ -29,7 +29,8 @@ Convenciones inspiradas en la referencia Bizagi `claro-post-consultareclamos.bpm
 3. Pools/lanes solo con justificación y evidencia.
 4. Todo elemento relevante con evidencia; sin evidencia suficiente → `DESCONOCIDA`.
 5. IDs estables; nodos con el ID de la definición.
-6. Layout horizontal, etiquetas legibles, sin solapes.
+6. **Diagrama por funcionalidad e insumos, compacto**: `functional-service-view` agrupa en una actividad INFERIDA toda región de decisiones/pasos técnicos (SESE) sin accesos a datos, llamadas externas, desconocidos ni finales; las decisiones sin efecto diferenciado no se dibujan. Objetivo ~25 actividades / ~12 decisiones. Los nombres funcionales se derivan de los métodos o de `functional-names.json` (escrito por el orquestador; UTF-8 sin BOM).
+7. Layout horizontal, etiquetas legibles, sin solapes.
 
 ## Advertencias conocidas
 

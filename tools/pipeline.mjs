@@ -1,9 +1,10 @@
-﻿// Operaciones deterministas del flujo BPMN Reverse Engineer (sin LLM).
+// Operaciones deterministas del flujo BPMN Reverse Engineer (sin LLM).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from './validation/schema-validator.mjs';
+import { workDir, INTERMEDIATE, publishDeliverables } from './layout-paths.mjs';
 import { draftProcess, discoverCandidates } from './analysis/draft-process.mjs';
 import { functionalServiceView, checkFunctionalCoverage } from './analysis/functional-service-view.mjs';
 import { generateActivityWord } from './documentation/activity-word.mjs';
@@ -31,13 +32,14 @@ export function assertId(value, label) {
 }
 
 export function paths(root = ROOT, projectId = null) {
+  const base = projectId ? workDir(root, assertId(projectId, 'project-id')) : path.join(root, 'outputs', '_shared');
   return {
     root,
     workspace: path.join(root, 'workspace'),
-    diagrams: path.join(root, 'outputs', projectId ? assertId(projectId, 'project-id') : '_shared', 'diagrams'),
-    previews: path.join(root, 'outputs', projectId ? assertId(projectId, 'project-id') : '_shared', 'previews'),
-    reports: path.join(root, 'outputs', projectId ? assertId(projectId, 'project-id') : '_shared', 'reports'),
-    traces: path.join(root, 'outputs', projectId ? assertId(projectId, 'project-id') : '_shared', 'traces'),
+    diagrams: path.join(base, 'diagrams'),
+    previews: path.join(base, 'previews'),
+    reports: path.join(base, 'reports'),
+    traces: path.join(base, 'traces'),
   };
 }
 
@@ -216,7 +218,9 @@ export async function generate(projectId, processId, { root = ROOT, preview = tr
   }
   const namesFile = path.join(pdir, 'functional-names.json');
   const funcNames = fs.existsSync(namesFile) ? readJson(namesFile) : {};
-  const { definition: view, map: viewMap } = functionalServiceView(def, { names: funcNames });
+  const traceForView = loadTrace(projectId, def.entry_point?.trace_id, root, processId);
+  const methodByNode = new Map((traceForView?.nodes || []).map((n) => [n.id, n.class && n.method ? `${n.class}.${n.method}` : null]));
+  const { definition: view, map: viewMap } = functionalServiceView(def, { names: funcNames, methodOf: (id) => methodByNode.get(id) });
   const coverage = checkFunctionalCoverage(def, view, viewMap);
   if (!coverage.valid) {
     writeJson(path.join(p.reports, `${processId}.generation-error.json`), { stage: 'vista-funcional', errors: coverage.errors });
@@ -286,8 +290,8 @@ export async function validateBpmnPath(file, { root = ROOT, definitionPath, side
   const full = resolveInput(root, file);
   if (!/\.(bpmn|xml)$/i.test(full) || !fs.existsSync(full)) throw new UsageError(`Archivo BPMN no encontrado o con extensión no admitida: ${file}`);
   const report = await validateBpmnFile(full, { definitionPath, sidecarPath });
-  const relative = path.relative(path.join(root, 'outputs'), full).split(path.sep);
-  const p = paths(root, relative.length === 3 && relative[1] === 'diagrams' && !relative[0].startsWith('..') ? relative[0] : null);
+  const relative = path.relative(path.join(root, 'workspace'), full).split(path.sep);
+  const p = paths(root, relative.length === 4 && relative[1] === INTERMEDIATE && ['diagrams', 'functional'].includes(relative[2]) && !relative[0].startsWith('..') ? relative[0] : null);
   const name = path.basename(full).replace(/\.(bpmn|xml)$/i, '');
   writeJson(path.join(p.reports, `${name}.validation.json`), report);
   writeText(path.join(p.reports, `${name}.validation.md`), renderValidationMarkdown(report));
@@ -311,7 +315,7 @@ export function exportNativeProject(projectId, results, { root = ROOT } = {}) {
   assertId(projectId, 'project-id');
   if (!results.length || results.some((r) => r.validation.approval !== 'APROBADO' || r.review.verdict === 'RECHAZADO')) throw new Error('La entrega nativa requiere modelos validados y sin revisión rechazada.');
   const native = buildNativeProject(projectId, results.map((r) => r.definition));
-  const filename = path.join(root, 'outputs', projectId, 'delivery', `${projectId}.bpm`);
+  const filename = path.join(workDir(root, projectId), 'delivery', `${projectId}.bpm`);
   const validationFile = path.join(paths(root, projectId).reports, `${projectId}.bizagi-validation.json`);
   // Conservar la entrega anterior para diagnosticar errores de apertura reales.
   if (fs.existsSync(filename)) {
@@ -347,15 +351,15 @@ export function finalReport(projectId, results, { root = ROOT } = {}) {
   const candidates = discoverCandidates(dir);
   const ref = fs.existsSync(path.join(root, DEFAULT_REFERENCE)) ? 'archivo presente; ejecute inspect-reference para el informe (outputs/_shared/reports/reference-inspection.md)' : 'no ejecutada: referencia ausente';
   let nativeProject = null;
-  const nativeFile = path.join(root, 'outputs', projectId, 'delivery', `${projectId}.bpm`);
+  const nativeFile = path.join(workDir(root, projectId), 'delivery', `${projectId}.bpm`);
   if (fs.existsSync(nativeFile)) {
     const checked = validateNativeProject(fs.readFileSync(nativeFile), results.map((r) => r.definition));
     if (checked.approval === 'APROBADO') {
-      nativeProject = { ...checked, file: `outputs/${projectId}/delivery/${projectId}.bpm`, validation_report: `outputs/${projectId}/reports/${projectId}.bizagi-validation.json` };
+      nativeProject = { ...checked, file: `workspace/${projectId}/_intermedios/delivery/${projectId}.bpm`, validation_report: `workspace/${projectId}/_intermedios/reports/${projectId}.bizagi-validation.json` };
       const providerFile = path.join(paths(root, projectId).reports, `${projectId}.bizagi-provider-load.json`);
       if (fs.existsSync(providerFile)) {
         const provider = readJson(providerFile);
-        if (provider.sha256 === checked.sha256 && provider.mode === 'load') nativeProject.provider_load = { ...provider, report: `outputs/${projectId}/reports/${projectId}.bizagi-provider-load.json` };
+        if (provider.sha256 === checked.sha256 && provider.mode === 'load') nativeProject.provider_load = { ...provider, report: `workspace/${projectId}/_intermedios/reports/${projectId}.bizagi-provider-load.json` };
       }
     }
   }
@@ -387,8 +391,10 @@ export async function pipeline(zipOrProject, { selector = '--all', force = true,
   }
   const nativeProject = bpm && results.length && results.every((r) => r.validation.approval === 'APROBADO' && r.review.verdict !== 'RECHAZADO') ? exportNativeProject(id, results, { root }) : null;
   const report = finalReport(id, results, { root });
+  const published = publishDeliverables(root, id);
   return {
     project_id: id,
+    published,
     ingest: ingestResult,
     analysis,
     discovery: disc.report,
