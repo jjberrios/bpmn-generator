@@ -30,19 +30,19 @@ export class GenerationError extends Error {
 
 function evidenceText(ev) {
   if (!ev) return '';
-  const loc = ev.file ? `${ev.file}${ev.line_start ? ':' + ev.line_start + (ev.line_end && ev.line_end !== ev.line_start ? '-' + ev.line_end : '') : ''}` : '(sin ubicaciÃ³n)';
+  const loc = ev.file ? `${ev.file}${ev.line_start ? ':' + ev.line_start + (ev.line_end && ev.line_end !== ev.line_start ? '-' + ev.line_end : '') : ''}` : '(sin ubicación)';
   const who = [ev.class, ev.method].filter(Boolean).join('.');
   return `[${ev.status}] ${loc}${who ? ' ' + who : ''}`;
 }
 
 /**
- * Genera el BPMN. Aborta con GenerationError si la definiciÃ³n no supera checkDefinition.
+ * Genera el BPMN. Aborta con GenerationError si la definición no supera checkDefinition.
  * @returns {Promise<{xml:string, layout:object, traceability:object, warnings:object[]}>}
  */
 export async function generateBpmn(def) {
   const checks = checkDefinition(def);
   if (checks.errors.length) {
-    throw new GenerationError(`La definiciÃ³n del proceso ${def.id} no es vÃ¡lida (${checks.errors.length} errores)`, checks.errors);
+    throw new GenerationError(`La definición del proceso ${def.id} no es válida (${checks.errors.length} errores)`, checks.errors);
   }
   const layout = layoutProcess(def);
   const moddle = new BpmnModdle();
@@ -93,7 +93,7 @@ export async function generateBpmn(def) {
   }
   for (const d of def.decisions) {
     const el = mk(GATEWAY_TYPES[d.gateway] || 'bpmn:ExclusiveGateway', { id: d.id, name: d.name });
-    el.documentation = docFor(d.id, d.condition_text ? `CondiciÃ³n evaluada: ${d.condition_text}` : undefined, d.evidence_ids, d.evidence_status);
+    el.documentation = docFor(d.id, d.condition_text ? `Condición evaluada: ${d.condition_text}` : undefined, d.evidence_ids, d.evidence_status);
     nodes.set(d.id, { el, ref: d });
   }
 
@@ -120,7 +120,7 @@ export async function generateBpmn(def) {
     }
   }
 
-  // almacenes de datos (raÃ­z) y referencias en el proceso
+  // almacenes de datos (raíz) y referencias en el proceso
   const dataStoreEls = new Map();
   for (const s of stores) {
     const ds = mk('bpmn:DataStore', { id: s.id, name: s.name });
@@ -132,7 +132,7 @@ export async function generateBpmn(def) {
     const ref = mk('bpmn:DataStoreReference', { id: r.id, name: def.participants.find((p) => p.id === r.store)?.name, dataStoreRef: dataStoreEls.get(r.store) });
     refEls.set(r.id, ref);
   }
-  // asociaciones de datos con ioSpecification (vÃ¡lido XSD)
+  // asociaciones de datos con ioSpecification (válido XSD)
   const dataEdgeIds = new Map();
   const perActivity = new Map();
   for (const r of layout.dsRefs) (perActivity.get(r.activity) || perActivity.set(r.activity, []).get(r.activity)).push(r);
@@ -184,7 +184,7 @@ export async function generateBpmn(def) {
   if (laneSets) process.laneSets = laneSets;
   process.documentation = docFor(`Process_${pid}`, [def.description, def.scope_note].filter(Boolean).join('\n'), (def.evidence || []).slice(0, 0).map((e) => e.id), null);
 
-  // ---------- colaboraciÃ³n ----------
+  // ---------- colaboración ----------
   const mainP = mk('bpmn:Participant', { id: mainParticipant.id, name: mainParticipant.name, processRef: process });
   mainP.documentation = docFor(mainParticipant.id, mainParticipant.justification, mainParticipant.evidence_ids, null);
   const extPs = new Map();

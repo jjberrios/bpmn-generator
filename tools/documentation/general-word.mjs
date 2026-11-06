@@ -16,6 +16,12 @@ function locations(projectId, processId, root) {
     narrative: path.join(root, 'workspace', projectId, 'processes', processId, 'process-explanation.json'),
   };
 }
+const PENDIENTE = 'Pendiente de redacción: falta la explicación respaldada por el código para este apartado (process-explanation.json).';
+export function missingNarrative(def, narrative = {}) {
+  const keys = ['purpose', 'entry', 'decisions', 'systems', 'implementation'].filter((k) => !(typeof narrative[k] === 'string' && narrative[k].trim()));
+  const steps = (def.activities || []).filter((a) => !(typeof narrative.steps?.[a.id] === 'string' && narrative.steps[a.id].trim())).map((a) => `steps.${a.id}`);
+  return [...keys, ...steps];
+}
 export function generalSections(def, narrative = {}) {
   const text = (key, fallback) => {
     if (narrative[key] !== undefined && (typeof narrative[key] !== 'string' || !narrative[key].trim())) throw new Error(`Explicación general: ${key} debe ser texto no vacío.`);
@@ -30,10 +36,10 @@ export function generalSections(def, narrative = {}) {
   return [
     { title: 'Descripción general del proceso', paragraphs: [text('purpose', `El proceso comprende las siguientes funciones: ${ordered.map(a => clean(a.name)).join(', ')}.`)] },
     { title: 'Inicio y entradas principales', paragraphs: [text('entry', `El proceso comienza con ${def.events.find(e => e.type === 'start')?.name || 'la solicitud de entrada'}. Las entradas no descritas en el modelo deben consultarse en el documento de actividades.`)] },
-    { title: 'Cómo funciona el proceso', paragraphs: ordered.map(a => `${a.name}: ${steps[a.id] || `El servicio realiza la actividad «${clean(a.name)}» en la etapa correspondiente del flujo.`}`) },
+    { title: 'Cómo funciona el proceso', paragraphs: ordered.map(a => `${a.name}: ${steps[a.id] || PENDIENTE}`) },
     { title: 'Decisiones y resultados', paragraphs: [text('decisions', decisions.length ? `El flujo se dirige según las siguientes comprobaciones: ${decisions.map(d => d.name).join('; ')}. Las conexiones del BPMN determinan qué etapa se ejecuta en cada caso.` : 'El modelo no contiene decisiones explícitas.'), ...results.map(o => `• ${def.events.find(e => e.id === o.event_id)?.name || o.name}`)] },
     { title: 'Sistemas y datos utilizados', paragraphs: [text('systems', data.length ? `El acceso a datos está representado por ${data.map(a => `«${clean(a.name)}»`).join(', ')}. El modelo no permite deducir efectos internos adicionales de esos sistemas.` : 'Las actividades de esta vista no declaran accesos a almacenes de datos. Esto no demuestra ausencia de otras integraciones en el código.')] },
-    { title: 'Qué hace el código', paragraphs: [text('implementation', `El código implementa las etapas representadas en el BPMN y sus rutas de respuesta. El documento de actividades conserva las entradas, salidas y transformaciones verificadas; esta explicación presenta su funcionamiento a nivel general, sin reproducir métodos ni parámetros técnicos.`)] },
+    { title: 'Qué hace el código', paragraphs: [text('implementation', PENDIENTE)] },
   ];
 }
 export function generateGeneralWord(projectId, processId, { root } = {}) {
@@ -56,8 +62,9 @@ export function generateGeneralWord(projectId, processId, { root } = {}) {
     file = path.join(p.folder, `${processId}.explicacion-general.actualizado.docx`);
     fs.writeFileSync(file, bytes);
   }
+  const missing = missingNarrative(def, narrative);
   const result = {
-    approval: 'APROBADO', content_status: activity.content_status,
+    approval: 'APROBADO', content_status: missing.length ? 'INCOMPLETO' : activity.content_status, missing_narrative: missing,
     file: path.relative(root, file).split(path.sep).join('/'), sha256: sha(bytes),
     activity_word_sha256: activity.sha256, bpmn_sha256: activity.bpmn_sha256,
     definition_sha256: activity.definition_sha256, evidence_sha256: activity.evidence_sha256,

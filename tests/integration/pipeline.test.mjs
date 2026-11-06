@@ -77,7 +77,10 @@ test('el pipeline entrega un único .bpm nativo con todos los diagramas y el CLI
   assert.match(read(`workspace/${PID}/_intermedios/reports/${PID}-informe-final.md`), /Opcional:\*\* `outputs\/orders-service\/orders-service\.bpm/);
   const published = fs.readdirSync(path.join(ROOT, `outputs/${PID}`), { withFileTypes: true });
   assert.ok(published.every((e) => e.isFile() && /\.(bpm|bpmn|docx)$/.test(e.name)), published.map((e) => e.name).join(", "));
-  assert.ok(published.some((e) => e.name === `${PID}.bpm`) && published.some((e) => e.name.endsWith(".bpmn")));
+  // Sin fichas ni explicación redactadas la entrega no es final: se publica como borrador identificado.
+  assert.equal(run.json.delivery.status, 'BORRADOR');
+  assert.ok(published.every((e) => e.name.startsWith('BORRADOR_')), published.map((e) => e.name).join(", "));
+  assert.ok(published.some((e) => e.name === `BORRADOR_${PID}.bpm`) && published.some((e) => e.name.endsWith(".bpmn")));
 });
 
 test('el informe solo muestra la carga del proveedor correspondiente al hash de la entrega', () => {

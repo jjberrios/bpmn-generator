@@ -7,6 +7,7 @@ import { validateContract } from './validation/schema-validator.mjs';
 import { workDir, INTERMEDIATE, publishDeliverables } from './layout-paths.mjs';
 import { draftProcess, discoverCandidates } from './analysis/draft-process.mjs';
 import { functionalServiceView, checkFunctionalCoverage } from './analysis/functional-service-view.mjs';
+import { namesTodo } from './validation/name-quality.mjs';
 import { generateActivityWord } from './documentation/activity-word.mjs';
 import { generateGeneralWord } from './documentation/general-word.mjs';
 import { generateBpmn, GenerationError } from './bpmn/generate-bpmn.mjs';
@@ -204,6 +205,13 @@ async function writePng(svg, file) {
   }
 }
 
+function writeNamesTodo(pdir, detail, view, viewMap, funcNames, methodOf) {
+  const file = path.join(pdir, 'functional-names.todo.json');
+  const items = namesTodo(detail, view, viewMap, funcNames, methodOf);
+  if (!items.length) { fs.rmSync(file, { force: true }); return; }
+  writeJson(file, { process_id: detail.id, instruction: 'Proponer en functional-names.json { "<id>": "Verbo + objeto funcional en español" } solo para operaciones respaldadas por los métodos/condiciones listados; si no hay evidencia suficiente, no inventar: dejar el elemento sin nombre y documentar la incertidumbre.', pending: items });
+}
+
 export async function generate(projectId, processId, { root = ROOT, preview = true } = {}) {
   requireProject(projectId, root);
   const pdir = processDir(projectId, processId, root);
@@ -222,6 +230,7 @@ export async function generate(projectId, processId, { root = ROOT, preview = tr
   const methodByNode = new Map((traceForView?.nodes || []).map((n) => [n.id, n.class && n.method ? `${n.class}.${n.method}` : null]));
   const { definition: view, map: viewMap } = functionalServiceView(def, { names: funcNames, methodOf: (id) => methodByNode.get(id) });
   const coverage = checkFunctionalCoverage(def, view, viewMap);
+  writeNamesTodo(pdir, def, view, viewMap, funcNames, (id) => methodByNode.get(id));
   if (!coverage.valid) {
     writeJson(path.join(p.reports, `${processId}.generation-error.json`), { stage: 'vista-funcional', errors: coverage.errors });
     throw new GenerationError('La vista funcional omite elementos obligatorios.', coverage.errors);
@@ -395,7 +404,7 @@ export async function pipeline(zipOrProject, { selector = '--all', force = true,
   return {
     project_id: id,
     published,
-    ingest: ingestResult,
+    delivery: published.quality,
     analysis,
     discovery: disc.report,
     generated: results.map((r) => ({ process_id: r.process_id, approval: r.validation.approval, verdict: r.review.verdict, documentation: r.documentation, files: r.files })),

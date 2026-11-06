@@ -80,7 +80,8 @@ async function main(argv) {
     case 'document': {
       const id = assertId(positionals[0], 'project-id');
       const documents = resolveCandidates(id, selectorOf(values)).map((c) => ({ ...generateActivityWord(id, c.process_id, { root: ROOT }), general: generateGeneralWord(id, c.process_id, { root: ROOT }) }));
-      out({ documents, published: publishDeliverables(ROOT, id) });
+      const published = publishDeliverables(ROOT, id);
+      out({ documents, published, delivery: published.quality });
       return 0;
     }
     case 'relabel-functional': {
@@ -175,7 +176,8 @@ async function main(argv) {
         summaries.push({ process_id: r.process_id, validation: r.validation.approval, review: r.review.verdict, errors: r.validation.summary.errors, warnings: r.validation.summary.warnings, documentation: r.documentation, files: r.files });
       }
       const nativeProject = values.bpm && !blocked && results.length ? exportNativeProject(id, results) : null;
-      out({ generated: summaries, native_project: nativeProject, bpmn_deliverable: summaries.map((s) => s.files), published: blocked ? null : publishDeliverables(ROOT, id) });
+      const published = blocked ? null : publishDeliverables(ROOT, id);
+      out({ generated: summaries, native_project: nativeProject, bpmn_deliverable: summaries.map((s) => s.files), published, delivery: published?.quality ?? null });
       return blocked ? 1 : 0;
     }
     case 'validate-bizagi': {
